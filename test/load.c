@@ -136,8 +136,12 @@ static MunitResult test_load_pmx_errors(const MunitParameter* params, void* data
   const mmdgltf_Pmx noent_pmx = mmdgltf_pmx_load_file("models/nonexistent.pmx");
   munit_assert_int(MMDGLTF_CHECK(noent_pmx), ==, MMDGLTF_ERROR_IO);
 
-  const char bad_sig[] = "funny random data hehehaha";
-  const mmdgltf_Pmx bad_pmx = mmdgltf_pmx_load_memory(bad_sig, sizeof(bad_sig));
+  const char bad_size[27] = "funny random data hehehaha";
+  mmdgltf_Pmx bad_pmx = mmdgltf_pmx_load_memory(bad_size, sizeof(bad_size));
+  munit_assert_int(MMDGLTF_CHECK(bad_pmx), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+
+  const char bad_sig[33] = "funny random data again hehehaha";
+  bad_pmx = mmdgltf_pmx_load_memory(bad_sig, sizeof(bad_sig));
   munit_assert_int(MMDGLTF_CHECK(bad_pmx), ==, MMDGLTF_ERROR_INVALID_SIGNATURE);
 
   return MUNIT_OK;

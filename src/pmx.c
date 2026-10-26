@@ -1,6 +1,9 @@
 #include "mmdgltf_internal.h"
+
 #include <stdio.h>
 #include <string.h>
+
+#define PMX_MIN_VALID_HEADER_SIZE 33
 
 void mmdgltf__stream_read_bytes(mmdgltf_Stream* s, void* dst, size_t count) {
   if (s->status != MMDGLTF_OK || count == 0) {
@@ -264,7 +267,7 @@ static const mmdgltf_StreamFunc mem_io = {
 };
 
 MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size) {
-  if (!data || size < 12) {
+  if (!data || size < PMX_MIN_VALID_HEADER_SIZE) {
     return (mmdgltf_Pmx)MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
   }
   mmdgltf__MemStream mem = {
@@ -275,27 +278,11 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size) {
   return mmdgltf_pmx_load_stream(&mem_io, &mem);
 }
 
-static size_t file_read(void* buff, size_t sz, size_t nmemb, void* src) {
-  return fread(buff, sz, nmemb, (FILE*)src);
-}
-
-static int file_seek(void* src, long offset, int origin) {
-  return fseek((FILE*)src, offset, origin);
-}
-
-static long file_tell(void* src) {
-  return ftell((FILE*)src);
-}
-
-static int file_eof(void* src) {
-  return feof((FILE*)src);
-}
-
 static const mmdgltf_StreamFunc file_io = {
-  .read = file_read,
-  .seek = file_seek,
-  .tell = file_tell,
-  .eof = file_eof,
+  .read = (PFN_mmdgltf_read_func)fread,
+  .seek = (PFN_mmdgltf_seek_func)(fseek),
+  .tell = (PFN_mmdgltf_tell_func)ftell,
+  .eof = (PFN_mmdgltf_eof_func)feof,
 };
 
 MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_filen(const char* path, size_t path_len) {
