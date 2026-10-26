@@ -34,6 +34,57 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   munit_assert_ptr_not_null(info.comment_jp);
   munit_assert_ptr_not_null(info.comment_en);
 
+  const mmdgltf_PmxVertex* vertices = NULL;
+  size_t vertex_count = 0;
+  ret = mmdgltf_pmx_vertices(pmx, &vertices, &vertex_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(vertex_count, ==, 29685);
+  munit_assert_ptr_not_null(vertices);
+  munit_assert_int(vertices[0].weight_type, ==, MMDGLTF_WEIGHT_BDEF1);
+  munit_assert_int32(vertices[0].bones[0], >=, 0);
+  munit_assert_float(vertices[0].weights[0], ==, 1.0f);
+
+  const uint32_t* indices = NULL;
+  size_t index_count = 0;
+  ret = mmdgltf_pmx_indices(pmx, &indices, &index_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(index_count, ==, 131748);
+  munit_assert_ptr_not_null(indices);
+  for (size_t i = 0; i < 100; ++i) {
+    munit_assert_uint32(indices[i], <, 29685);
+  }
+
+  const mmdgltf_PmxTexture* textures = NULL;
+  size_t texture_count = 0;
+  ret = mmdgltf_pmx_textures(pmx, &textures, &texture_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(texture_count, ==, 27);
+  munit_assert_ptr_not_null(textures);
+  munit_assert_string_equal(textures[0].path, "Texture/tume.png");
+  munit_assert_string_equal(textures[1].path, "Sphere/s_takane_01.png");
+  for (size_t i = 0; i < texture_count; ++i) {
+    munit_assert_ptr_not_null(textures[i].path);
+    munit_assert_null(strchr(textures[i].path, '\\'));
+  }
+
+  const mmdgltf_PmxMaterial* materials = NULL;
+  size_t material_count = 0;
+  ret = mmdgltf_pmx_materials(pmx, &materials, &material_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(material_count, ==, 47);
+  munit_assert_ptr_not_null(materials);
+  munit_assert_string_equal(materials[0].name_jp, "ツメ");
+  munit_assert_uint32(materials[0].index_count, ==, 390);
+  munit_assert_int32(materials[0].texture_index, ==, 0);
+  munit_assert_int32(materials[0].sphere_texture_index, ==, 1);
+  munit_assert_int(materials[0].sphere_mode, ==, MMDGLTF_SPHERE_ADD);
+
+  size_t total_mat_indices = 0;
+  for (size_t i = 0; i < material_count; ++i) {
+    total_mat_indices += materials[i].index_count;
+  }
+  munit_assert_size(total_mat_indices, ==, 131748);
+
   mmdgltf_pmx_destroy(pmx);
 
   // same thing with non null terminated string
@@ -143,6 +194,11 @@ static MunitResult test_load_pmx_errors(const MunitParameter* params, void* data
   const char bad_sig[33] = "funny random data again hehehaha";
   bad_pmx = mmdgltf_pmx_load_memory(bad_sig, sizeof(bad_sig));
   munit_assert_int(MMDGLTF_CHECK(bad_pmx), ==, MMDGLTF_ERROR_INVALID_SIGNATURE);
+
+  munit_assert_int(mmdgltf_pmx_vertices(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_indices(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_textures(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_materials(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   return MUNIT_OK;
 }

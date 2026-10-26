@@ -81,6 +81,8 @@ i16 mmdgltf__stream_read_i16(mmdgltf_Stream* s);
 u32 mmdgltf__stream_read_u32(mmdgltf_Stream* s);
 i32 mmdgltf__stream_read_i32(mmdgltf_Stream* s);
 f32 mmdgltf__stream_read_f32(mmdgltf_Stream* s);
+u32 mmdgltf__stream_read_vertex_index(mmdgltf_Stream* s, u8 size);
+i32 mmdgltf__stream_read_index(mmdgltf_Stream* s, u8 size);
 void mmdgltf__stream_read_bytes(mmdgltf_Stream* s, void* dst, size_t count);
 char* mmdgltf__stream_read_string(mmdgltf_Stream* s, mmdgltf_Arena* arena,
                                   mmdgltf_TextEncoding encoding);
@@ -89,6 +91,14 @@ struct mmdgltf_Pmx_T {
   mmdgltf_Arena* arena;
   mmdgltf_PmxHeader header;
   mmdgltf_PmxModelInfo model_info;
+  mmdgltf_PmxVertex* vertices;
+  size_t vertex_count;
+  u32* indices;
+  size_t index_count;
+  mmdgltf_PmxTexture* textures;
+  size_t texture_count;
+  mmdgltf_PmxMaterial* materials;
+  size_t material_count;
 };
 
 #endif // MMDGLTF_INTERNAL_H

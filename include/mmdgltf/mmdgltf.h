@@ -19,6 +19,17 @@
 #define MMDGLTF_API
 #endif
 
+#ifndef MMDGLTF_MAX_BONE_WEIGHTS
+#define MMDGLTF_MAX_BONE_WEIGHTS 4
+#endif
+
+#ifndef MMDGLTF_MAX_EXTRA_UVS
+#define MMDGLTF_MAX_EXTRA_UVS 4
+#endif
+
+#define MMDGLTF_ENCODE_ERROR(status) ((void*)(((uintptr_t)(status)) << 48))
+#define MMDGLTF_CHECK(ptr)           ((mmdgltf_Status)(((uintptr_t)(ptr)) >> 48))
+
 #define MMDGLTF_SEEK_SET 0
 #define MMDGLTF_SEEK_CUR 1
 #define MMDGLTF_SEEK_END 2
@@ -37,9 +48,6 @@ typedef enum mmdgltf_Status {
   MMDGLTF_ERROR_BUFFER_TOO_SMALL = 6,
   MMDGLTF_ERROR_CORRUPT_DATA = 7,
 } mmdgltf_Status;
-
-#define MMDGLTF_ENCODE_ERROR(status) ((void*)(((uintptr_t)(status)) << 48))
-#define MMDGLTF_CHECK(ptr)           ((mmdgltf_Status)(((uintptr_t)(ptr)) >> 48))
 
 typedef void* (*PFN_mmdgltf_alloc_func)(size_t size, void* user);
 typedef void* (*PFN_mmdgltf_realloc_func)(void* ptr, size_t oldsz, size_t newsz, void* user);
@@ -69,6 +77,30 @@ typedef enum mmdgltf_TextEncoding {
   MMDGLTF_ENCODING_UTF8 = 1,
 } mmdgltf_TextEncoding;
 
+typedef enum mmdgltf_WeightType {
+  MMDGLTF_WEIGHT_BDEF1 = 0,
+  MMDGLTF_WEIGHT_BDEF2 = 1,
+  MMDGLTF_WEIGHT_BDEF4 = 2,
+  MMDGLTF_WEIGHT_SDEF = 3,
+  MMDGLTF_WEIGHT_QDEF = 4,
+} mmdgltf_WeightType;
+
+typedef enum mmdgltf_SphereMode {
+  MMDGLTF_SPHERE_NONE = 0,
+  MMDGLTF_SPHERE_MUL = 1,
+  MMDGLTF_SPHERE_ADD = 2,
+  MMDGLTF_SPHERE_SUBTEXTURE = 3,
+} mmdgltf_SphereMode;
+
+#define MMDGLTF_MATERIAL_DOUBLE_SIDED    0x01
+#define MMDGLTF_MATERIAL_GROUND_SHADOW   0x02
+#define MMDGLTF_MATERIAL_SELF_SHADOW_MAP 0x04
+#define MMDGLTF_MATERIAL_SELF_SHADOW     0x08
+#define MMDGLTF_MATERIAL_EDGE            0x10
+#define MMDGLTF_MATERIAL_VERTEX_COLOR    0x20
+#define MMDGLTF_MATERIAL_POINT_DRAWING   0x40
+#define MMDGLTF_MATERIAL_LINE_DRAWING    0x80
+
 typedef struct mmdgltf_PmxHeader {
   float version;
   mmdgltf_TextEncoding encoding;
@@ -88,6 +120,43 @@ typedef struct mmdgltf_PmxModelInfo {
   const char* comment_en;
 } mmdgltf_PmxModelInfo;
 
+typedef struct mmdgltf_PmxVertex {
+  float position[3];
+  float normal[3];
+  float uv[2];
+  float additional_uvs[MMDGLTF_MAX_EXTRA_UVS][4];
+  mmdgltf_WeightType weight_type;
+  int32_t bones[MMDGLTF_MAX_BONE_WEIGHTS];
+  float weights[MMDGLTF_MAX_BONE_WEIGHTS];
+  float sdef_c[3];
+  float sdef_r0[3];
+  float sdef_r1[3];
+  float edge_scale;
+} mmdgltf_PmxVertex;
+
+typedef struct mmdgltf_PmxTexture {
+  const char* path;
+} mmdgltf_PmxTexture;
+
+typedef struct mmdgltf_PmxMaterial {
+  const char* name_jp;
+  const char* name_en;
+  const char* comment;
+  float diffuse[4];
+  float specular[3];
+  float shininess;
+  float ambient[3];
+  uint8_t draw_flags;
+  float edge_color[4];
+  float edge_size;
+  int32_t texture_index;
+  int32_t sphere_texture_index;
+  mmdgltf_SphereMode sphere_mode;
+  uint8_t toon_sharing_flag;
+  int32_t toon_index;
+  uint32_t index_count;
+} mmdgltf_PmxMaterial;
+
 typedef struct mmdgltf_Pmx_T* mmdgltf_Pmx;
 
 MMDGLTF_API void mmdgltf_set_alloc(const mmdgltf_Alloc* alloc);
@@ -101,6 +170,17 @@ MMDGLTF_API void mmdgltf_pmx_destroy(mmdgltf_Pmx pmx);
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_get_header(mmdgltf_Pmx pmx, mmdgltf_PmxHeader* out_header);
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_get_model_info(mmdgltf_Pmx pmx,
                                                       mmdgltf_PmxModelInfo* out_info);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_vertices(mmdgltf_Pmx pmx,
+                                                const mmdgltf_PmxVertex** out_vertices,
+                                                size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_indices(mmdgltf_Pmx pmx, const uint32_t** out_indices,
+                                               size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_textures(mmdgltf_Pmx pmx,
+                                                const mmdgltf_PmxTexture** out_textures,
+                                                size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_materials(mmdgltf_Pmx pmx,
+                                                 const mmdgltf_PmxMaterial** out_materials,
+                                                 size_t* out_count);
 
 #ifdef __cplusplus
 }
