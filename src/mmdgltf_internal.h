@@ -12,8 +12,9 @@
 extern _Thread_local mmdgltf_Alloc mmdgltf__alloc;
 #define MMDGLTF_MALLOC(_sz) mmdgltf__alloc.alloc(_sz, mmdgltf__alloc.user)
 #define MMDGLTF_CALLOC(_sz, _n) MMDGLTF_MALLOC(_sz*_n)
-#define MMDGLTF_REALLOC(_ptr, _newsz) mmdgltf__alloc(_ptr, _newsz, mmdgltf__alloc.user)
-#define MMDGLTF_FREE(_ptr) mmdgltf__alloc.dealloc(_ptr, mmdgltf__alloc.user)
+#define MMDGLTF_REALLOC(_ptr, _oldsz, _newsz) \
+  mmdgltf__alloc(_ptr, _oldsz, _newsz, mmdgltf__alloc.user)
+#define MMDGLTF_FREE(_ptr, _sz) mmdgltf__alloc.dealloc(_ptr, _sz, mmdgltf__alloc.user)
 
 typedef int8_t i8;
 typedef uint16_t u16;

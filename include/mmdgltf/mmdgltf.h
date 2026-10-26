@@ -24,8 +24,8 @@ extern "C" {
 #endif
 
 typedef void*(PFN_mmdgltf_alloc_func)(size_t size, void* user);
-typedef void*(PFN_mmdgltf_realloc_func)(void* ptr, size_t newsize, void* user);
-typedef void(PFN_mmdgltf_dealloc_func)(void* ptr, void* user);
+typedef void*(PFN_mmdgltf_realloc_func)(void* ptr, size_t oldsz, size_t newsz, void* user);
+typedef void(PFN_mmdgltf_dealloc_func)(void* ptr, size_t size, void* user);
 
 typedef struct mmdgltf_Alloc{
   PFN_mmdgltf_alloc_func alloc;

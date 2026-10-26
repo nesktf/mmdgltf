@@ -5,12 +5,14 @@ static void* mmd_alloc(size_t sz, void* user) {
   return malloc(sz);
 }
 
-static void* mmd_realloc(void* ptr, size_t newsz, void* user) {
+static void* mmd_realloc(void* ptr, size_t oldsz, size_t newsz, void* user) {
   UNUSED(user);
+  UNUSED(oldsz);
   return realloc(ptr, newsz);
 }
 
-static void mmd_dealloc(void* ptr, void* user) {
+static void mmd_dealloc(void* ptr, size_t size, void* user) {
+  UNUSED(size);
   UNUSED(user);
   free(ptr);
 }
