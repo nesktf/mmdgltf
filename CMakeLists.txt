@@ -21,18 +21,19 @@ else()
 endif()
 
 message(STATUS "mmdgltf: Setting up version ${MMDGLTF_VER_STR}")
-project(cnbt VERSION ${MMDGLTF_VER} LANGUAGES C)
+project(mmdgltf VERSION ${MMDGLTF_VER} LANGUAGES C)
 
 set(MMDGLTF_SOURCES
   "${MMDGLTF_SOURCE_DIR}/core.c"
-  "${MMDGLTF_SOURCE_DIR}/tiny_gltf_v3.c"
+  "${MMDGLTF_SOURCE_DIR}/arena.c"
+  "${MMDGLTF_SOURCE_DIR}/pmx.c"
 )
 list(APPEND MMDGLTF_INCLUDE ${MMDGLTF_INCLUDE_DIR})
 set(MMDGLTF_HEADERS "${MMDGLTF_INCLUDE_DIR}/mmdgltf/mmdgltf.h")
 
 add_library(${PROJECT_NAME} ${MMDGLTF_BUILD_TYPE})
 target_sources(${PROJECT_NAME} PRIVATE ${MMDGLTF_SOURCES})
-target_include_directories(${PROJECT_NAME} PUBLIC ${MMDGLTF_INCLUDE})
+target_include_directories(${PROJECT_NAME} PUBLIC ${MMDGLTF_INCLUDE} PRIVATE ${MMDGLTF_SOURCE_DIR})
 target_link_libraries(${PROJECT_NAME} ${MMDGLTF_LINK})
 
 if (MMDGLTF_SHARED_BUILD)
@@ -41,7 +42,7 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${MMDGLTF_DEFS})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX "d")
-set_property(TARGET cnbt PROPERTY C_STANDARD 11)
+set_property(TARGET mmdgltf PROPERTY C_STANDARD 11)
 
 if (MMDGLTF_BUILD_TESTS)
   message(STATUS "mmdgltf: Building tests")

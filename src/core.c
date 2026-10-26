@@ -28,7 +28,7 @@ MMDGLTF_API void mmdgltf_set_alloc(const mmdgltf_Alloc* alloc) {
   if (!alloc) {
     return;
   }
-  if (!alloc->dealloc || !alloc->realloc || !alloc->dealloc) {
+  if (!alloc->alloc || !alloc->realloc || !alloc->dealloc) {
     return;
   }
   mmdgltf__alloc = *alloc;
