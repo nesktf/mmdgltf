@@ -199,3 +199,53 @@ char* mmdgltf__stream_read_string(mmdgltf_Stream* s, mmdgltf_Arena* arena,
   }
   return decode_utf16le(arena, str_bytes, (size_t)len);
 }
+
+size_t mmdgltf__mem_read(void* buff, size_t sz, size_t nmemb, mmdgltf__MemStream* m) {
+  if (!m || !buff || sz == 0 || nmemb == 0) {
+    return 0;
+  }
+  const size_t total = sz * nmemb;
+  const size_t available = (m->pos < m->size) ? (m->size - m->pos) : 0;
+  const size_t to_copy = total < available ? total : available;
+  if (to_copy > 0) {
+    memcpy(buff, m->data + m->pos, to_copy);
+    m->pos += to_copy;
+  }
+  return to_copy / sz;
+}
+
+int mmdgltf__mem_seek(mmdgltf__MemStream* m, long offset, int origin) {
+  if (!m) {
+    return -1;
+  }
+  long new_pos = 0;
+  if (origin == MMDGLTF_SEEK_SET) {
+    new_pos = offset;
+  } else if (origin == MMDGLTF_SEEK_CUR) {
+    new_pos = (long)m->pos + offset;
+  } else if (origin == MMDGLTF_SEEK_END) {
+    new_pos = (long)m->size + offset;
+  } else {
+    return -1;
+  }
+  if (new_pos < 0 || (size_t)new_pos > m->size) {
+    return -1;
+  }
+  m->pos = (size_t)new_pos;
+  return 0;
+}
+
+long mmdgltf__mem_tell(mmdgltf__MemStream* m) {
+  return m ? (long)m->pos : -1;
+}
+
+int mmdgltf__mem_eof(mmdgltf__MemStream* m) {
+  return (!m || m->pos >= m->size) ? 1 : 0;
+}
+
+const mmdgltf_StreamFunc mmdgltf__mem_io = {
+  .read = (PFN_mmdgltf_read_func)mmdgltf__mem_read,
+  .seek = (PFN_mmdgltf_seek_func)mmdgltf__mem_seek,
+  .tell = (PFN_mmdgltf_tell_func)mmdgltf__mem_tell,
+  .eof = (PFN_mmdgltf_eof_func)mmdgltf__mem_eof,
+};

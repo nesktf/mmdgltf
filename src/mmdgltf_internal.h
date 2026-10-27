@@ -93,6 +93,18 @@ void mmdgltf__stream_read_bytes(mmdgltf_Stream* s, void* dst, size_t count);
 char* mmdgltf__stream_read_string(mmdgltf_Stream* s, mmdgltf_Arena* arena,
                                   mmdgltf_TextEncoding encoding);
 
+typedef struct mmdgltf__MemStream {
+  const u8* data;
+  size_t size;
+  size_t pos;
+} mmdgltf__MemStream;
+
+size_t mmdgltf__mem_read(void* buff, size_t sz, size_t nmemb, mmdgltf__MemStream* m);
+int mmdgltf__mem_seek(mmdgltf__MemStream* m, long offset, int origin);
+long mmdgltf__mem_tell(mmdgltf__MemStream* m);
+int mmdgltf__mem_eof(mmdgltf__MemStream* m);
+extern const mmdgltf_StreamFunc mmdgltf__mem_io;
+
 struct mmdgltf_Pmx_T {
   mmdgltf_Arena* arena;
   mmdgltf_PmxHeader header;
