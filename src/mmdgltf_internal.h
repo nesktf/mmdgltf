@@ -81,6 +81,12 @@ i16 mmdgltf__stream_read_i16(mmdgltf_Stream* s);
 u32 mmdgltf__stream_read_u32(mmdgltf_Stream* s);
 i32 mmdgltf__stream_read_i32(mmdgltf_Stream* s);
 f32 mmdgltf__stream_read_f32(mmdgltf_Stream* s);
+mmdgltf_Vec2f mmdgltf__stream_read_vec2(mmdgltf_Stream* s);
+mmdgltf_Vec3f mmdgltf__stream_read_vec3(mmdgltf_Stream* s);
+mmdgltf_Vec4f mmdgltf__stream_read_vec4(mmdgltf_Stream* s);
+mmdgltf_Color3f mmdgltf__stream_read_color3(mmdgltf_Stream* s);
+mmdgltf_Color4f mmdgltf__stream_read_color4(mmdgltf_Stream* s);
+mmdgltf_Quatf mmdgltf__stream_read_quat(mmdgltf_Stream* s);
 u32 mmdgltf__stream_read_vertex_index(mmdgltf_Stream* s, u8 size);
 i32 mmdgltf__stream_read_index(mmdgltf_Stream* s, u8 size);
 void mmdgltf__stream_read_bytes(mmdgltf_Stream* s, void* dst, size_t count);
@@ -99,6 +105,16 @@ struct mmdgltf_Pmx_T {
   size_t texture_count;
   mmdgltf_PmxMaterial* materials;
   size_t material_count;
+  mmdgltf_PmxBone* bones;
+  size_t bone_count;
+  mmdgltf_PmxMorph* morphs;
+  size_t morph_count;
+  mmdgltf_PmxDisplayItem* display_items;
+  size_t display_item_count;
+  mmdgltf_PmxRigidBody* rigid_bodies;
+  size_t rigid_body_count;
+  mmdgltf_PmxJoint* joints;
+  size_t joint_count;
 };
 
 #endif // MMDGLTF_INTERNAL_H

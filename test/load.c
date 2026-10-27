@@ -43,6 +43,7 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   munit_assert_int(vertices[0].weight_type, ==, MMDGLTF_WEIGHT_BDEF1);
   munit_assert_int32(vertices[0].bones[0], >=, 0);
   munit_assert_float(vertices[0].weights[0], ==, 1.0f);
+  munit_assert_float(vertices[0].uv.x, >=, 0.0f);
 
   const uint32_t* indices = NULL;
   size_t index_count = 0;
@@ -74,6 +75,7 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   munit_assert_size(material_count, ==, 47);
   munit_assert_ptr_not_null(materials);
   munit_assert_string_equal(materials[0].name_jp, "ツメ");
+  munit_assert_float(materials[0].diffuse.a, ==, 1.0f);
   munit_assert_uint32(materials[0].index_count, ==, 390);
   munit_assert_int32(materials[0].texture_index, ==, 0);
   munit_assert_int32(materials[0].sphere_texture_index, ==, 1);
@@ -84,6 +86,64 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
     total_mat_indices += materials[i].index_count;
   }
   munit_assert_size(total_mat_indices, ==, 131748);
+
+  const mmdgltf_PmxBone* bones = NULL;
+  size_t bone_count = 0;
+  ret = mmdgltf_pmx_bones(pmx, &bones, &bone_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(bone_count, ==, 301);
+  munit_assert_ptr_not_null(bones);
+  munit_assert_string_equal(bones[0].name_jp, "全ての親");
+  munit_assert_int32(bones[0].parent_index, ==, -1);
+  munit_assert_float(bones[0].position.x, ==, 0.0f);
+  munit_assert_int32(bones[97].ik_target_index, >=, 0);
+  munit_assert_uint32(bones[97].ik_link_count, ==, 1);
+  munit_assert_ptr_not_null(bones[97].ik_links);
+
+  const mmdgltf_PmxMorph* morphs = NULL;
+  size_t morph_count = 0;
+  ret = mmdgltf_pmx_morphs(pmx, &morphs, &morph_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(morph_count, ==, 168);
+  munit_assert_ptr_not_null(morphs);
+  munit_assert_string_equal(morphs[0].name_jp, "スフィア暗");
+  munit_assert_int(morphs[0].type, ==, MMDGLTF_MORPH_MATERIAL);
+  munit_assert_uint32(morphs[0].offset_count, ==, 1);
+  munit_assert_ptr_not_null(morphs[0].material_offsets);
+  munit_assert_float(morphs[0].material_offsets[0].sphere_texture_factor.r, ==, -3.0f);
+
+  const mmdgltf_PmxDisplayItem* display_items = NULL;
+  size_t display_item_count = 0;
+  ret = mmdgltf_pmx_display_items(pmx, &display_items, &display_item_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(display_item_count, ==, 16);
+  munit_assert_ptr_not_null(display_items);
+  munit_assert_string_equal(display_items[0].name_jp, "Root");
+  munit_assert_uint8(display_items[0].is_special, ==, 1);
+  munit_assert_uint32(display_items[0].element_count, ==, 1);
+
+  const mmdgltf_PmxRigidBody* rigid_bodies = NULL;
+  size_t rigid_body_count = 0;
+  ret = mmdgltf_pmx_rigid_bodies(pmx, &rigid_bodies, &rigid_body_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(rigid_body_count, ==, 81);
+  munit_assert_ptr_not_null(rigid_bodies);
+  munit_assert_string_equal(rigid_bodies[0].name_jp, "左胸親");
+  munit_assert_int32(rigid_bodies[0].bone_index, ==, 77);
+  munit_assert_int(rigid_bodies[0].shape_type, ==, MMDGLTF_RIGID_SHAPE_SPHERE);
+  munit_assert_int(rigid_bodies[0].physics_mode, ==, MMDGLTF_RIGID_MODE_STATIC);
+  munit_assert_float(rigid_bodies[0].size.x, >, 0.0f);
+
+  const mmdgltf_PmxJoint* joints = NULL;
+  size_t joint_count = 0;
+  ret = mmdgltf_pmx_joints(pmx, &joints, &joint_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(joint_count, ==, 39);
+  munit_assert_ptr_not_null(joints);
+  munit_assert_string_equal(joints[0].name_jp, "左胸上");
+  munit_assert_int32(joints[0].src_rigid, ==, 0);
+  munit_assert_int32(joints[0].dest_rigid, ==, 2);
+  munit_assert_float(joints[0].position.y, >, 0.0f);
 
   mmdgltf_pmx_destroy(pmx);
 
@@ -100,21 +160,9 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   return MUNIT_OK;
 }
 
-static size_t test_io_read(void* buff, size_t sz, size_t nmemb, void* src) {
-  return fread(buff, sz, nmemb, (FILE*)src);
-}
-
-static int test_io_seek(void* src, long offset, int origin) {
-  return fseek((FILE*)src, offset, origin);
-}
-
-static long test_io_tell(void* src) {
-  return ftell((FILE*)src);
-}
-
-static int test_io_eof(void* src) {
-  return feof((FILE*)src);
-}
+static_assert(MMDGLTF_SEEK_CUR == SEEK_CUR, "SEEK_CUR mismatch");
+static_assert(MMDGLTF_SEEK_END == SEEK_END, "SEEK_END mismatch");
+static_assert(MMDGLTF_SEEK_SET == SEEK_SET, "SEEK_SET mismatch");
 
 static MunitResult test_load_pmx_stream(const MunitParameter* params, void* data) {
   UNUSED(params);
@@ -124,10 +172,10 @@ static MunitResult test_load_pmx_stream(const MunitParameter* params, void* data
   munit_assert_ptr_not_null(f);
 
   const mmdgltf_StreamFunc func = {
-    .read = test_io_read,
-    .seek = test_io_seek,
-    .tell = test_io_tell,
-    .eof = test_io_eof,
+    .read = (PFN_mmdgltf_read_func)fread,
+    .seek = (PFN_mmdgltf_seek_func)fseek,
+    .tell = (PFN_mmdgltf_tell_func)ftell,
+    .eof = (PFN_mmdgltf_eof_func)feof,
   };
 
   const mmdgltf_Pmx pmx = mmdgltf_pmx_load_stream(&func, f);
@@ -148,14 +196,14 @@ static MunitResult test_load_pmx_memory(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* const f = fopen(model_path, "rb");
+  FILE* f = fopen(model_path, "rb");
   munit_assert_ptr_not_null(f);
 
   fseek(f, 0, SEEK_END);
   const long sz = ftell(f);
   fseek(f, 0, SEEK_SET);
 
-  void* const buf = malloc((size_t)sz);
+  void* buf = malloc((size_t)sz);
   munit_assert_ptr_not_null(buf);
   munit_assert_size(fread(buf, 1, (size_t)sz, f), ==, (size_t)sz);
   fclose(f);
@@ -199,6 +247,12 @@ static MunitResult test_load_pmx_errors(const MunitParameter* params, void* data
   munit_assert_int(mmdgltf_pmx_indices(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_pmx_textures(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_pmx_materials(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_bones(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_morphs(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_display_items(NULL, NULL, NULL), ==,
+                   MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_rigid_bodies(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_pmx_joints(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   return MUNIT_OK;
 }

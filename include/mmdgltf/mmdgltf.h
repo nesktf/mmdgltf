@@ -72,6 +72,30 @@ typedef struct mmdgltf_StreamFunc {
   PFN_mmdgltf_eof_func eof;
 } mmdgltf_StreamFunc;
 
+typedef struct mmdgltf_Vec2f {
+  float x, y;
+} mmdgltf_Vec2f;
+
+typedef struct mmdgltf_Vec3f {
+  float x, y, z;
+} mmdgltf_Vec3f;
+
+typedef struct mmdgltf_Color3f {
+  float r, g, b;
+} mmdgltf_Color3f;
+
+typedef struct mmdgltf_Vec4f {
+  float x, y, z, w;
+} mmdgltf_Vec4f;
+
+typedef struct mmdgltf_Color4f {
+  float r, g, b, a;
+} mmdgltf_Color4f;
+
+typedef struct mmdgltf_Quatf {
+  float x, y, z, w;
+} mmdgltf_Quatf;
+
 typedef enum mmdgltf_TextEncoding {
   MMDGLTF_ENCODING_UTF16LE = 0,
   MMDGLTF_ENCODING_UTF8 = 1,
@@ -121,16 +145,16 @@ typedef struct mmdgltf_PmxModelInfo {
 } mmdgltf_PmxModelInfo;
 
 typedef struct mmdgltf_PmxVertex {
-  float position[3];
-  float normal[3];
-  float uv[2];
-  float additional_uvs[MMDGLTF_MAX_EXTRA_UVS][4];
+  mmdgltf_Vec3f position;
+  mmdgltf_Vec3f normal;
+  mmdgltf_Vec2f uv;
+  mmdgltf_Vec4f additional_uvs[MMDGLTF_MAX_EXTRA_UVS];
   mmdgltf_WeightType weight_type;
   int32_t bones[MMDGLTF_MAX_BONE_WEIGHTS];
   float weights[MMDGLTF_MAX_BONE_WEIGHTS];
-  float sdef_c[3];
-  float sdef_r0[3];
-  float sdef_r1[3];
+  mmdgltf_Vec3f sdef_c;
+  mmdgltf_Vec3f sdef_r0;
+  mmdgltf_Vec3f sdef_r1;
   float edge_scale;
 } mmdgltf_PmxVertex;
 
@@ -142,12 +166,12 @@ typedef struct mmdgltf_PmxMaterial {
   const char* name_jp;
   const char* name_en;
   const char* comment;
-  float diffuse[4];
-  float specular[3];
+  mmdgltf_Color4f diffuse;
+  mmdgltf_Color3f specular;
   float shininess;
-  float ambient[3];
+  mmdgltf_Color3f ambient;
   uint8_t draw_flags;
-  float edge_color[4];
+  mmdgltf_Color4f edge_color;
   float edge_size;
   int32_t texture_index;
   int32_t sphere_texture_index;
@@ -156,6 +180,182 @@ typedef struct mmdgltf_PmxMaterial {
   int32_t toon_index;
   uint32_t index_count;
 } mmdgltf_PmxMaterial;
+
+#define MMDGLTF_BONE_CONNECTION_TARGET_BONE 0x0001
+#define MMDGLTF_BONE_ROTATABLE              0x0002
+#define MMDGLTF_BONE_MOVABLE                0x0004
+#define MMDGLTF_BONE_VISIBLE                0x0008
+#define MMDGLTF_BONE_CONTROLLABLE           0x0010
+#define MMDGLTF_BONE_IK                     0x0020
+#define MMDGLTF_BONE_LOCAL_APPEND           0x0080
+#define MMDGLTF_BONE_APPEND_ROTATION        0x0100
+#define MMDGLTF_BONE_APPEND_TRANSLATION     0x0200
+#define MMDGLTF_BONE_FIXED_AXIS             0x0400
+#define MMDGLTF_BONE_LOCAL_AXIS             0x0800
+#define MMDGLTF_BONE_PHYSICS_TRANSFORM      0x1000
+#define MMDGLTF_BONE_EXTERNAL_PARENT        0x2000
+
+typedef struct mmdgltf_PmxIkLink {
+  int32_t bone_index;
+  uint8_t has_limits;
+  mmdgltf_Vec3f min_angle;
+  mmdgltf_Vec3f max_angle;
+} mmdgltf_PmxIkLink;
+
+typedef struct mmdgltf_PmxBone {
+  const char* name_jp;
+  const char* name_en;
+  mmdgltf_Vec3f position;
+  int32_t parent_index;
+  int32_t transform_order;
+  uint16_t flags;
+  mmdgltf_Vec3f offset;
+  int32_t connection_bone_index;
+  int32_t inherit_bone_index;
+  float inherit_weight;
+  mmdgltf_Vec3f fixed_axis;
+  mmdgltf_Vec3f local_x;
+  mmdgltf_Vec3f local_z;
+  int32_t external_parent_key;
+  int32_t ik_target_index;
+  int32_t ik_loop_count;
+  float ik_limit_angle;
+  uint32_t ik_link_count;
+  const mmdgltf_PmxIkLink* ik_links;
+} mmdgltf_PmxBone;
+
+typedef enum mmdgltf_MorphCategory {
+  MMDGLTF_MORPH_CATEGORY_SYSTEM = 0,
+  MMDGLTF_MORPH_CATEGORY_EYEBROW = 1,
+  MMDGLTF_MORPH_CATEGORY_EYE = 2,
+  MMDGLTF_MORPH_CATEGORY_MOUTH = 3,
+  MMDGLTF_MORPH_CATEGORY_OTHER = 4,
+} mmdgltf_MorphCategory;
+
+typedef enum mmdgltf_MorphType {
+  MMDGLTF_MORPH_GROUP = 0,
+  MMDGLTF_MORPH_VERTEX = 1,
+  MMDGLTF_MORPH_BONE = 2,
+  MMDGLTF_MORPH_UV = 3,
+  MMDGLTF_MORPH_EXTRA_UV1 = 4,
+  MMDGLTF_MORPH_EXTRA_UV2 = 5,
+  MMDGLTF_MORPH_EXTRA_UV3 = 6,
+  MMDGLTF_MORPH_EXTRA_UV4 = 7,
+  MMDGLTF_MORPH_MATERIAL = 8,
+  MMDGLTF_MORPH_FLIP = 9,
+  MMDGLTF_MORPH_IMPULSE = 10,
+} mmdgltf_MorphType;
+
+typedef struct mmdgltf_PmxVertexMorphOffset {
+  uint32_t vertex_index;
+  mmdgltf_Vec3f position_offset;
+} mmdgltf_PmxVertexMorphOffset;
+
+typedef struct mmdgltf_PmxUvMorphOffset {
+  uint32_t vertex_index;
+  mmdgltf_Vec4f uv_offset;
+} mmdgltf_PmxUvMorphOffset;
+
+typedef struct mmdgltf_PmxBoneMorphOffset {
+  int32_t bone_index;
+  mmdgltf_Vec3f translation_offset;
+  mmdgltf_Quatf rotation_offset;
+} mmdgltf_PmxBoneMorphOffset;
+
+typedef struct mmdgltf_PmxMaterialMorphOffset {
+  int32_t material_index;
+  uint8_t offset_type;
+  mmdgltf_Color4f diffuse;
+  mmdgltf_Color3f specular;
+  float shininess;
+  mmdgltf_Color3f ambient;
+  mmdgltf_Color4f edge_color;
+  float edge_size;
+  mmdgltf_Color4f texture_factor;
+  mmdgltf_Color4f sphere_texture_factor;
+  mmdgltf_Color4f toon_texture_factor;
+} mmdgltf_PmxMaterialMorphOffset;
+
+typedef struct mmdgltf_PmxGroupMorphOffset {
+  int32_t morph_index;
+  float factor;
+} mmdgltf_PmxGroupMorphOffset;
+
+typedef struct mmdgltf_PmxMorph {
+  const char* name_jp;
+  const char* name_en;
+  mmdgltf_MorphCategory category;
+  mmdgltf_MorphType type;
+  uint32_t offset_count;
+
+  union {
+    const mmdgltf_PmxVertexMorphOffset* vertex_offsets;
+    const mmdgltf_PmxUvMorphOffset* uv_offsets;
+    const mmdgltf_PmxBoneMorphOffset* bone_offsets;
+    const mmdgltf_PmxMaterialMorphOffset* material_offsets;
+    const mmdgltf_PmxGroupMorphOffset* group_offsets;
+    const void* raw_offsets;
+  };
+} mmdgltf_PmxMorph;
+
+typedef struct mmdgltf_PmxDisplayElement {
+  uint8_t type;
+  int32_t index;
+} mmdgltf_PmxDisplayElement;
+
+typedef struct mmdgltf_PmxDisplayItem {
+  const char* name_jp;
+  const char* name_en;
+  uint8_t is_special;
+  uint32_t element_count;
+  const mmdgltf_PmxDisplayElement* elements;
+} mmdgltf_PmxDisplayItem;
+
+typedef enum mmdgltf_RigidShapeType {
+  MMDGLTF_RIGID_SHAPE_SPHERE = 0,
+  MMDGLTF_RIGID_SHAPE_BOX = 1,
+  MMDGLTF_RIGID_SHAPE_CAPSULE = 2,
+} mmdgltf_RigidShapeType;
+
+typedef enum mmdgltf_RigidPhysicsMode {
+  MMDGLTF_RIGID_MODE_STATIC = 0,
+  MMDGLTF_RIGID_MODE_DYNAMIC = 1,
+  MMDGLTF_RIGID_MODE_DYNAMIC_BONE_ALIGN = 2,
+} mmdgltf_RigidPhysicsMode;
+
+typedef struct mmdgltf_PmxRigidBody {
+  const char* name_jp;
+  const char* name_en;
+  int32_t bone_index;
+  uint8_t collision_group;
+  uint16_t collision_mask;
+  mmdgltf_RigidShapeType shape_type;
+  mmdgltf_Vec3f size;
+  mmdgltf_Vec3f position;
+  mmdgltf_Vec3f rotation;
+  float mass;
+  float linear_damping;
+  float angular_damping;
+  float restitution;
+  float friction;
+  mmdgltf_RigidPhysicsMode physics_mode;
+} mmdgltf_PmxRigidBody;
+
+typedef struct mmdgltf_PmxJoint {
+  const char* name_jp;
+  const char* name_en;
+  uint8_t type;
+  int32_t src_rigid;
+  int32_t dest_rigid;
+  mmdgltf_Vec3f position;
+  mmdgltf_Vec3f rotation;
+  mmdgltf_Vec3f min_position;
+  mmdgltf_Vec3f max_position;
+  mmdgltf_Vec3f min_rotation;
+  mmdgltf_Vec3f max_rotation;
+  mmdgltf_Vec3f spring_position;
+  mmdgltf_Vec3f spring_rotation;
+} mmdgltf_PmxJoint;
 
 typedef struct mmdgltf_Pmx_T* mmdgltf_Pmx;
 
@@ -181,6 +381,17 @@ MMDGLTF_API mmdgltf_Status mmdgltf_pmx_textures(mmdgltf_Pmx pmx,
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_materials(mmdgltf_Pmx pmx,
                                                  const mmdgltf_PmxMaterial** out_materials,
                                                  size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_bones(mmdgltf_Pmx pmx, const mmdgltf_PmxBone** out_bones,
+                                             size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_morphs(mmdgltf_Pmx pmx, const mmdgltf_PmxMorph** out_morphs,
+                                              size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_display_items(
+  mmdgltf_Pmx pmx, const mmdgltf_PmxDisplayItem** out_display_items, size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_rigid_bodies(mmdgltf_Pmx pmx,
+                                                    const mmdgltf_PmxRigidBody** out_rigid_bodies,
+                                                    size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_pmx_joints(mmdgltf_Pmx pmx, const mmdgltf_PmxJoint** out_joints,
+                                              size_t* out_count);
 
 #ifdef __cplusplus
 }

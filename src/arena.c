@@ -17,7 +17,7 @@ static mmdgltf_ArenaBlock* arena_new_block(mmdgltf_Arena* arena, size_t min_size
     return NULL;
   }
 
-  mmdgltf_ArenaBlock* block = (mmdgltf_ArenaBlock*)ptr;
+  mmdgltf_ArenaBlock* block = ptr;
   block->base = ptr + sizeof(mmdgltf_ArenaBlock);
   block->used = 0;
   block->capacity = cap;
@@ -35,7 +35,7 @@ static mmdgltf_ArenaBlock* arena_new_block(mmdgltf_Arena* arena, size_t min_size
 }
 
 mmdgltf_Arena* mmdgltf__arena_create(size_t block_size) {
-  mmdgltf_Arena* arena = (mmdgltf_Arena*)MMDGLTF_MALLOC(sizeof(mmdgltf_Arena));
+  mmdgltf_Arena* arena = MMDGLTF_MALLOC(sizeof(mmdgltf_Arena));
   if (!arena) {
     return NULL;
   }
@@ -72,7 +72,7 @@ char* mmdgltf__arena_strndup(mmdgltf_Arena* arena, const char* str, size_t len) 
     return NULL;
   }
 
-  char* dst = (char*)mmdgltf__arena_alloc(arena, len + 1);
+  char* dst = mmdgltf__arena_alloc(arena, len + 1);
   if (!dst) {
     return NULL;
   }
