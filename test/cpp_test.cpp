@@ -1,11 +1,12 @@
 #include "mmdgltf/mmdgltf.hpp"
+#include "paths.h"
 
 #include <cassert>
 #include <cstdio>
 #include <string>
 #include <vector>
 
-static const char* model_path = "models/nitori/河城にとり.pmx";
+static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
 
 static void test_expected_special_members() {
   mmdgltf::Expected<int> e1;
@@ -220,10 +221,69 @@ static void test_pmx_model_loading_and_getters() {
   assert(exp_stream.has_value());
 }
 
+static void test_gpu_model_runtime() {
+  auto exp_pmx = mmdgltf::PmxModel::load_file(model_path);
+  assert(exp_pmx.has_value());
+
+  mmdgltf_ModelConfig cfg;
+  mmdgltf_model_config_default(&cfg);
+  cfg.scale = 1.0f;
+  cfg.coordinate_system = MMDGLTF_COORDS_GLTF_RIGHT_HANDED;
+
+  auto exp_model = mmdgltf::model_create(*exp_pmx, &cfg);
+  assert(exp_model.has_value());
+  assert(!exp_model->empty());
+
+  auto exp_model2 = mmdgltf::model_create(exp_pmx->raw(), &cfg);
+  assert(exp_model2.has_value());
+  assert(!exp_model2->empty());
+
+  // verify model data independence
+  exp_pmx->reset();
+
+  auto vbufs = exp_model->vertex_buffers();
+  assert(vbufs.has_value());
+  assert(vbufs->vertex_count == 29685);
+  assert(vbufs->positions != nullptr);
+  assert(vbufs->normals != nullptr);
+  assert(vbufs->uvs != nullptr);
+  assert(vbufs->joints != nullptr);
+  assert(vbufs->weights != nullptr);
+
+  auto indices = exp_model->indices();
+  assert(indices.has_value());
+  assert(indices->size() == 131748);
+
+  auto materials = exp_model->materials();
+  assert(materials.has_value());
+  assert(materials->size() == 47);
+
+  auto bones = exp_model->bones();
+  assert(bones.has_value());
+  assert(bones->size() == 301);
+
+  auto morphs = exp_model->morphs();
+  assert(morphs.has_value());
+  assert(morphs->size() == 168);
+
+  auto rbs = exp_model->rigid_bodies();
+  assert(rbs.has_value());
+  assert(rbs->size() == 81);
+
+  auto joints = exp_model->joints();
+  assert(joints.has_value());
+  assert(joints->size() == 39);
+
+  mmdgltf::Model moved_model(std::move(*exp_model));
+  assert(!moved_model.empty());
+  assert(exp_model->empty());
+}
+
 int main() {
   test_expected_special_members();
   test_expected_monadic_operations();
   test_pmx_model_loading_and_getters();
+  test_gpu_model_runtime();
   printf("All mmdgltf C++ tests passed!\n");
   return 0;
 }

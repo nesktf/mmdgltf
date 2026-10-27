@@ -129,4 +129,23 @@ struct mmdgltf_Pmx_T {
   size_t joint_count;
 };
 
+struct mmdgltf_Model_T {
+  mmdgltf_Arena* arena;
+  mmdgltf_ModelConfig config;
+  mmdgltf_VertexBuffers vertex_buffers;
+  size_t vertex_count;
+  u32* indices;
+  size_t index_count;
+  mmdgltf_PmxMaterial* materials;
+  size_t material_count;
+  mmdgltf_PmxBone* bones;
+  size_t bone_count;
+  mmdgltf_PmxMorph* morphs;
+  size_t morph_count;
+  mmdgltf_PmxRigidBody* rigid_bodies;
+  size_t rigid_body_count;
+  mmdgltf_PmxJoint* joints;
+  size_t joint_count;
+};
+
 #endif // MMDGLTF_INTERNAL_H

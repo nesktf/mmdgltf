@@ -359,6 +359,61 @@ typedef struct mmdgltf_PmxJoint {
 
 typedef struct mmdgltf_Pmx_T* mmdgltf_Pmx;
 
+typedef enum mmdgltf_CoordinateSystem {
+  MMDGLTF_COORDS_GLTF_RIGHT_HANDED = 0,
+  MMDGLTF_COORDS_MMD_LEFT_HANDED = 1,
+} mmdgltf_CoordinateSystem;
+
+#define MMDGLTF_LOAD_VERTICES  0x0001
+#define MMDGLTF_LOAD_MATERIALS 0x0002
+#define MMDGLTF_LOAD_BONES     0x0004
+#define MMDGLTF_LOAD_MORPHS    0x0008
+#define MMDGLTF_LOAD_PHYSICS   0x0010
+#define MMDGLTF_LOAD_ALL       0x001F
+
+typedef struct mmdgltf_ModelConfig {
+  uint32_t load_flags;
+  mmdgltf_CoordinateSystem coordinate_system;
+  float scale;
+} mmdgltf_ModelConfig;
+
+typedef struct mmdgltf_VertexBuffers {
+  size_t vertex_count;
+  const float* positions;
+  const float* normals;
+  const float* uvs;
+  const uint16_t* joints;
+  const float* weights;
+  const float* sdef_c;
+  const float* sdef_r0;
+  const float* sdef_r1;
+} mmdgltf_VertexBuffers;
+
+typedef struct mmdgltf_Model_T* mmdgltf_Model;
+
+MMDGLTF_API void mmdgltf_model_config_default(mmdgltf_ModelConfig* out_config);
+MMDGLTF_API mmdgltf_Model mmdgltf_model_create(mmdgltf_Pmx pmx, const mmdgltf_ModelConfig* config);
+MMDGLTF_API void mmdgltf_model_destroy(mmdgltf_Model model);
+
+MMDGLTF_API mmdgltf_Status mmdgltf_model_vertex_buffers(mmdgltf_Model model,
+                                                        mmdgltf_VertexBuffers* out_buffers);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_indices(mmdgltf_Model model, const uint32_t** out_indices,
+                                                 size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_materials(mmdgltf_Model model,
+                                                   const mmdgltf_PmxMaterial** out_materials,
+                                                   size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_bones(mmdgltf_Model model,
+                                               const mmdgltf_PmxBone** out_bones,
+                                               size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_morphs(mmdgltf_Model model,
+                                                const mmdgltf_PmxMorph** out_morphs,
+                                                size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_rigid_bodies(
+  mmdgltf_Model model, const mmdgltf_PmxRigidBody** out_rigid_bodies, size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_joints(mmdgltf_Model model,
+                                                const mmdgltf_PmxJoint** out_joints,
+                                                size_t* out_count);
+
 MMDGLTF_API void mmdgltf_set_alloc(const mmdgltf_Alloc* alloc);
 
 MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_file(const char* path);

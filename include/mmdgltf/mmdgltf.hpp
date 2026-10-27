@@ -39,6 +39,9 @@ using PmxDisplayItem = mmdgltf_PmxDisplayItem;
 using PmxDisplayElement = mmdgltf_PmxDisplayElement;
 using PmxRigidBody = mmdgltf_PmxRigidBody;
 using PmxJoint = mmdgltf_PmxJoint;
+using CoordinateSystem = mmdgltf_CoordinateSystem;
+using ModelConfig = mmdgltf_ModelConfig;
+using VertexBuffers = mmdgltf_VertexBuffers;
 using StreamFunc = mmdgltf_StreamFunc;
 using Alloc = mmdgltf_Alloc;
 
@@ -797,6 +800,153 @@ public:
 private:
   mmdgltf_Pmx _pmx;
 };
+
+class Model {
+public:
+  static Expected<Model> create(mmdgltf_Pmx pmx, const ModelConfig* config = nullptr) noexcept {
+    auto model = mmdgltf_model_create(pmx, config);
+    if (auto err = MMDGLTF_CHECK(model); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, model};
+  }
+
+  static Expected<Model> create(const PmxModel& pmx_model,
+                                const ModelConfig* config = nullptr) noexcept {
+    return create(pmx_model.raw(), config);
+  }
+
+public:
+  Model() noexcept : _model(nullptr) {}
+
+  explicit Model(mmdgltf_Model model) noexcept : _model(model) {}
+
+  explicit Model(mmdgltf_Pmx pmx, const ModelConfig* config = nullptr) {
+    _model = mmdgltf_model_create(pmx, config);
+    if (auto err = MMDGLTF_CHECK(_model); err != MMDGLTF_OK) {
+#ifdef __cpp_exceptions
+      throw Error(err);
+#else
+      assert(0 && "Model error");
+#endif
+    }
+  }
+
+  explicit Model(const PmxModel& pmx_model, const ModelConfig* config = nullptr) :
+      Model(pmx_model.raw(), config) {}
+
+  ~Model() noexcept { mmdgltf_model_destroy(_model); }
+
+  Model(Model&& other) noexcept : _model(other._model) { other._model = nullptr; }
+
+  Model& operator=(Model&& other) noexcept {
+    if (this != &other) {
+      mmdgltf_model_destroy(_model);
+      _model = other._model;
+      other._model = nullptr;
+    }
+    return *this;
+  }
+
+  Model(const Model&) = delete;
+  Model& operator=(const Model&) = delete;
+
+public:
+  bool empty() const noexcept { return _model == nullptr; }
+
+  explicit operator bool() const noexcept { return _model != nullptr; }
+
+  mmdgltf_Model raw() const noexcept { return _model; }
+
+  mmdgltf_Model get() const noexcept { return _model; }
+
+  mmdgltf_Model release() noexcept {
+    auto m = _model;
+    _model = nullptr;
+    return m;
+  }
+
+  void reset(mmdgltf_Model model = nullptr) noexcept {
+    mmdgltf_model_destroy(_model);
+    _model = model;
+  }
+
+public:
+  Expected<VertexBuffers> vertex_buffers() const noexcept {
+    VertexBuffers bufs{};
+    if (auto err = mmdgltf_model_vertex_buffers(_model, &bufs); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, bufs};
+  }
+
+  Expected<ArrayView<const uint32_t>> indices() const noexcept {
+    const uint32_t* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_indices(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+  Expected<ArrayView<const PmxMaterial>> materials() const noexcept {
+    const PmxMaterial* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_materials(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+  Expected<ArrayView<const PmxBone>> bones() const noexcept {
+    const PmxBone* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_bones(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+  Expected<ArrayView<const PmxMorph>> morphs() const noexcept {
+    const PmxMorph* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_morphs(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+  Expected<ArrayView<const PmxRigidBody>> rigid_bodies() const noexcept {
+    const PmxRigidBody* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_rigid_bodies(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+  Expected<ArrayView<const PmxJoint>> joints() const noexcept {
+    const PmxJoint* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_joints(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+private:
+  mmdgltf_Model _model;
+};
+
+inline Expected<Model> model_create(mmdgltf_Pmx pmx,
+                                    const ModelConfig* config = nullptr) noexcept {
+  return Model::create(pmx, config);
+}
+
+inline Expected<Model> model_create(const PmxModel& pmx_model,
+                                    const ModelConfig* config = nullptr) noexcept {
+  return Model::create(pmx_model, config);
+}
 
 inline Expected<PmxModel> pmx_load_file(const char* path) noexcept {
   return PmxModel::load_file(path);

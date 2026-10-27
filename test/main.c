@@ -12,12 +12,14 @@ int main(int argc, char* argv[]) {
   size_t len = 1; // One extra for the null terminator
   len += load_tests.len;
   len += stream_tests.len;
+  len += model_tests.len;
 
   MunitTest* tests = malloc(len * sizeof(*tests));
   memset(tests, 0x00, len * sizeof(*tests));
   size_t pos = 0;
   add_tests(load_tests, tests, &pos);
   add_tests(stream_tests, tests, &pos);
+  add_tests(model_tests, tests, &pos);
 
   const MunitSuite suite = {
     .prefix = "/mmdgltf-tests",

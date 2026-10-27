@@ -29,6 +29,7 @@ endif()
 add_executable(${PROJECT_NAME} ${MMDGLTF_TEST_SRC} ${munit_SOURCE_DIR}/munit.c)
 target_include_directories(${PROJECT_NAME}
   PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/../src"
   "${munit_SOURCE_DIR}"
 )

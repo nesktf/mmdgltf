@@ -1,8 +1,9 @@
+#include "paths.h"
 #include "tests.h"
 
 #include <stdio.h>
 
-static const char* model_path = "models/nitori/河城にとり.pmx"; // add a model fixture later
+static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
 
 static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) {
   UNUSED(params);
