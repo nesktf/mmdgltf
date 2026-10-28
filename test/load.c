@@ -258,11 +258,114 @@ static MunitResult test_load_pmx_errors(const MunitParameter* params, void* data
   return MUNIT_OK;
 }
 
+static MunitResult test_load_pmd_file(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const mmdgltf_Pmx pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_MIKU_PMD);
+  munit_assert_ptr_not_null(pmx);
+  munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
+
+  mmdgltf_PmxHeader header;
+  mmdgltf_Status ret = mmdgltf_pmx_get_header(pmx, &header);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_double_equal(header.version, 2.0, 5);
+  munit_assert_int(header.encoding, ==, MMDGLTF_ENCODING_UTF8);
+
+  mmdgltf_PmxModelInfo info;
+  ret = mmdgltf_pmx_get_model_info(pmx, &info);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_string_equal(info.name_jp, "初音ミク");
+  munit_assert_ptr_not_null(info.comment_jp);
+  munit_assert_ptr_not_null(strstr(info.comment_jp, "初音ミク"));
+
+  const mmdgltf_PmxVertex* vertices = NULL;
+  size_t vertex_count = 0;
+  ret = mmdgltf_pmx_vertices(pmx, &vertices, &vertex_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(vertex_count, ==, 9036);
+  munit_assert_ptr_not_null(vertices);
+  munit_assert_int(vertices[0].weight_type, ==, MMDGLTF_WEIGHT_BDEF2);
+  munit_assert_int32(vertices[0].bones[0], ==, 3);
+  munit_assert_int32(vertices[0].bones[1], ==, 0);
+  munit_assert_float(vertices[0].weights[0], ==, 1.0f);
+  munit_assert_float(vertices[0].weights[1], ==, 0.0f);
+
+  const uint32_t* indices = NULL;
+  size_t index_count = 0;
+  ret = mmdgltf_pmx_indices(pmx, &indices, &index_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(index_count, ==, 44991);
+  munit_assert_ptr_not_null(indices);
+  for (size_t i = 0; i < 100; ++i) {
+    munit_assert_uint32(indices[i], <, 9036);
+  }
+
+  mmdgltf_pmx_destroy(pmx);
+  return MUNIT_OK;
+}
+
+static MunitResult test_load_pmd_dammy(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const mmdgltf_Pmx pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_DAMMY_PMD);
+  munit_assert_ptr_not_null(pmx);
+  munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
+
+  mmdgltf_PmxModelInfo info;
+  mmdgltf_Status ret = mmdgltf_pmx_get_model_info(pmx, &info);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_string_equal(info.name_jp, "ダミーボーン");
+
+  const mmdgltf_PmxVertex* vertices = NULL;
+  size_t vertex_count = 0;
+  ret = mmdgltf_pmx_vertices(pmx, &vertices, &vertex_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(vertex_count, ==, 0);
+
+  const uint32_t* indices = NULL;
+  size_t index_count = 0;
+  ret = mmdgltf_pmx_indices(pmx, &indices, &index_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(index_count, ==, 0);
+
+  mmdgltf_pmx_destroy(pmx);
+  return MUNIT_OK;
+}
+
+static MunitResult test_load_pmd_errors(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const mmdgltf_Pmx null_pmd = mmdgltf_pmd_load_file(NULL);
+  munit_assert_int(MMDGLTF_CHECK(null_pmd), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+
+  const mmdgltf_Pmx null_stream = mmdgltf_pmd_load_stream(NULL, NULL);
+  munit_assert_int(MMDGLTF_CHECK(null_stream), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+
+  const mmdgltf_Pmx noent_pmd = mmdgltf_pmd_load_file("models/nonexistent.pmd");
+  munit_assert_int(MMDGLTF_CHECK(noent_pmd), ==, MMDGLTF_ERROR_IO);
+
+  const char bad_sig[20] = "XYZ\x00\x00\x80\x3f";
+  mmdgltf_Pmx bad_pmd = mmdgltf_pmd_load_memory(bad_sig, sizeof(bad_sig));
+  munit_assert_int(MMDGLTF_CHECK(bad_pmd), ==, MMDGLTF_ERROR_INVALID_SIGNATURE);
+
+  const char bad_ver[20] = "Pmd\x00\x00\x00\x40";
+  bad_pmd = mmdgltf_pmd_load_memory(bad_ver, sizeof(bad_ver));
+  munit_assert_int(MMDGLTF_CHECK(bad_pmd), ==, MMDGLTF_ERROR_UNSUPPORTED_VERSION);
+
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
   {"/load/pmx-file", test_load_pmx_file, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/load/pmx-stream", test_load_pmx_stream, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/load/pmx-memory", test_load_pmx_memory, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/load/pmx-errors", test_load_pmx_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/load/pmd-file", test_load_pmd_file, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/load/pmd-dammy", test_load_pmd_dammy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/load/pmd-errors", test_load_pmd_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 };
 
 TestData load_tests = {

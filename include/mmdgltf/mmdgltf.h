@@ -99,6 +99,7 @@ typedef struct mmdgltf_Quatf {
 typedef enum mmdgltf_TextEncoding {
   MMDGLTF_ENCODING_UTF16LE = 0,
   MMDGLTF_ENCODING_UTF8 = 1,
+  MMDGLTF_ENCODING_CP932 = 2,
 } mmdgltf_TextEncoding;
 
 typedef enum mmdgltf_WeightType {
@@ -446,6 +447,11 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_filen(const char* path, size_t path_len
 MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size);
 MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_stream(const mmdgltf_StreamFunc* func, void* src);
 MMDGLTF_API void mmdgltf_pmx_destroy(mmdgltf_Pmx pmx);
+
+MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_file(const char* path);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_filen(const char* path, size_t path_len);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_memory(const void* data, size_t size);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_stream(const mmdgltf_StreamFunc* func, void* src);
 
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_get_header(mmdgltf_Pmx pmx, mmdgltf_PmxHeader* out_header);
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_get_model_info(mmdgltf_Pmx pmx,

@@ -110,6 +110,8 @@ i32 mmdgltf__stream_read_index(mmdgltf_Stream* s, u8 size);
 void mmdgltf__stream_read_bytes(mmdgltf_Stream* s, void* dst, size_t count);
 char* mmdgltf__stream_read_string(mmdgltf_Stream* s, mmdgltf_Arena* arena,
                                   mmdgltf_TextEncoding encoding);
+char* mmdgltf__decode_cp932(mmdgltf_Arena* arena, const u8* src, size_t src_bytes);
+char* mmdgltf__stream_read_string_cp932(mmdgltf_Stream* s, mmdgltf_Arena* arena, size_t fixed_len);
 
 typedef struct mmdgltf__MemStream {
   const u8* data;
