@@ -292,11 +292,34 @@ static void test_gpu_model_runtime() {
          (*exp_glb)[3] == 'F');
 }
 
+static void test_fastpath_cpp() {
+  const char* out_file = "/tmp/test_cpp_fastpath.glb";
+  auto status = mmdgltf::convert_pmx_file(model_path, out_file);
+  assert(status == MMDGLTF_OK);
+
+  FILE* f = fopen(model_path, "rb");
+  assert(f != nullptr);
+  fseek(f, 0, SEEK_END);
+  long fsz = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  std::vector<uint8_t> pmx_bytes(fsz);
+  size_t rd = fread(pmx_bytes.data(), 1, fsz, f);
+  assert(rd == static_cast<size_t>(fsz));
+  fclose(f);
+
+  auto glb_res = mmdgltf::convert_pmx_memory(pmx_bytes.data(), pmx_bytes.size());
+  assert(glb_res.has_value());
+  assert(glb_res->size() > 20);
+  assert((*glb_res)[0] == 'g' && (*glb_res)[1] == 'l' && (*glb_res)[2] == 'T' &&
+         (*glb_res)[3] == 'F');
+}
+
 int main() {
   test_expected_special_members();
   test_expected_monadic_operations();
   test_pmx_model_loading_and_getters();
   test_gpu_model_runtime();
+  test_fastpath_cpp();
   printf("All mmdgltf C++ tests passed!\n");
   return 0;
 }

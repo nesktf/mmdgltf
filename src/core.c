@@ -26,6 +26,51 @@ size_t mmdgltf__bytevec_append(mmdgltf__ByteVec* bv, const void* src, size_t sz)
   return aligned_offset;
 }
 
+tg3_str mmdgltf__tg3_make_str(mmdgltf_Arena* arena, const char* s) {
+  tg3_str r;
+  if (!s) {
+    r.data = "";
+    r.len = 0;
+    return r;
+  }
+  const size_t len = strlen(s);
+  char* copy = mmdgltf__arena_strndup(arena, s, len);
+  r.data = copy ? copy : "";
+  r.len = (u32)len;
+  return r;
+}
+
+tg3_value mmdgltf__tg3_make_str_value(mmdgltf_Arena* arena, const char* s) {
+  tg3_value v;
+  memset(&v, 0, sizeof(v));
+  v.type = TG3_VALUE_STRING;
+  v.string_val = mmdgltf__tg3_make_str(arena, s);
+  return v;
+}
+
+tg3_value mmdgltf__tg3_make_int_value(i64 val) {
+  tg3_value v;
+  memset(&v, 0, sizeof(v));
+  v.type = TG3_VALUE_INT;
+  v.int_val = val;
+  return v;
+}
+
+tg3_value mmdgltf__tg3_make_real_value(f64 val) {
+  tg3_value v;
+  memset(&v, 0, sizeof(v));
+  v.type = TG3_VALUE_REAL;
+  v.real_val = val;
+  return v;
+}
+
+tg3_kv_pair mmdgltf__tg3_make_kv(mmdgltf_Arena* arena, const char* key, tg3_value val) {
+  tg3_kv_pair p;
+  p.key = mmdgltf__tg3_make_str(arena, key);
+  p.value = val;
+  return p;
+}
+
 static void* mmd_alloc(size_t sz, void* user) {
   UNUSED(user);
   return malloc(sz);

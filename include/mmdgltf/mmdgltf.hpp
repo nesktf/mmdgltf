@@ -975,6 +975,31 @@ inline Expected<Model> model_create(const PmxModel& pmx_model,
   return Model::create(pmx_model, config);
 }
 
+inline Status convert_pmx_file(const char* pmx_path, const char* glb_path,
+                               const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_pmx_file(pmx_path, glb_path, config);
+}
+
+inline Status convert_pmx_filen(const char* pmx_path, size_t pmx_path_len, const char* glb_path,
+                                size_t glb_path_len,
+                                const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_pmx_filen(pmx_path, pmx_path_len, glb_path, glb_path_len, config);
+}
+
+inline Expected<std::vector<uint8_t>>
+convert_pmx_memory(const uint8_t* pmx_data, size_t pmx_size,
+                   const ExportConfig* config = nullptr) noexcept {
+  uint8_t* data = nullptr;
+  size_t size = 0;
+  if (auto err = mmdgltf_convert_pmx_memory(pmx_data, pmx_size, &data, &size, config);
+      err != MMDGLTF_OK) {
+    return {unexpect, err};
+  }
+  std::vector<uint8_t> result(data, data + size);
+  mmdgltf_export_free(data, size);
+  return {in_place, std::move(result)};
+}
+
 inline Expected<PmxModel> pmx_load_file(const char* path) noexcept {
   return PmxModel::load_file(path);
 }

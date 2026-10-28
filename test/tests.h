@@ -13,5 +13,6 @@ extern TestData load_tests;
 extern TestData stream_tests;
 extern TestData model_tests;
 extern TestData export_tests;
+extern TestData fastpath_tests;
 
 #endif // MMDGLTF_TESTS_H

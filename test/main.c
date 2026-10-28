@@ -14,6 +14,7 @@ int main(int argc, char* argv[]) {
   len += stream_tests.len;
   len += model_tests.len;
   len += export_tests.len;
+  len += fastpath_tests.len;
 
   MunitTest* tests = malloc(len * sizeof(*tests));
   memset(tests, 0x00, len * sizeof(*tests));
@@ -22,6 +23,7 @@ int main(int argc, char* argv[]) {
   add_tests(stream_tests, tests, &pos);
   add_tests(model_tests, tests, &pos);
   add_tests(export_tests, tests, &pos);
+  add_tests(fastpath_tests, tests, &pos);
 
   const MunitSuite suite = {
     .prefix = "/mmdgltf-tests",

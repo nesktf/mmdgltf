@@ -409,6 +409,7 @@ typedef struct mmdgltf_ExportConfig {
   uint8_t export_skinning;
   uint8_t export_morphs;
   uint8_t export_physics;
+  float scale;
 } mmdgltf_ExportConfig;
 
 MMDGLTF_API void mmdgltf_set_alloc(const mmdgltf_Alloc* alloc);
@@ -481,6 +482,15 @@ MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_memory(mmdgltf_Model model, uint8_
                                                      size_t* out_size,
                                                      const mmdgltf_ExportConfig* config);
 MMDGLTF_API void mmdgltf_export_free(uint8_t* data, size_t size);
+
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_file(const char* pmx_path, const char* glb_path,
+                                                    const mmdgltf_ExportConfig* config);
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_filen(const char* pmx_path, size_t pmx_path_len,
+                                                     const char* glb_path, size_t glb_path_len,
+                                                     const mmdgltf_ExportConfig* config);
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_memory(const uint8_t* pmx_data, size_t pmx_size,
+                                                      uint8_t** out_glb_data, size_t* out_glb_size,
+                                                      const mmdgltf_ExportConfig* config);
 
 #ifdef __cplusplus
 }

@@ -14,51 +14,7 @@ MMDGLTF_API void mmdgltf_export_config_default(mmdgltf_ExportConfig* out_config)
   out_config->export_skinning = 1;
   out_config->export_morphs = 1;
   out_config->export_physics = 1;
-}
-
-static tg3_str make_str(mmdgltf_Arena* arena, const char* s) {
-  tg3_str r;
-  if (!s) {
-    r.data = "";
-    r.len = 0;
-    return r;
-  }
-  const size_t len = strlen(s);
-  char* copy = mmdgltf__arena_strndup(arena, s, len);
-  r.data = copy ? copy : "";
-  r.len = (u32)len;
-  return r;
-}
-
-static tg3_value make_str_value(mmdgltf_Arena* arena, const char* s) {
-  tg3_value v;
-  memset(&v, 0, sizeof(v));
-  v.type = TG3_VALUE_STRING;
-  v.string_val = make_str(arena, s);
-  return v;
-}
-
-static tg3_value make_int_value(i64 val) {
-  tg3_value v;
-  memset(&v, 0, sizeof(v));
-  v.type = TG3_VALUE_INT;
-  v.int_val = val;
-  return v;
-}
-
-static tg3_value make_real_value(f64 val) {
-  tg3_value v;
-  memset(&v, 0, sizeof(v));
-  v.type = TG3_VALUE_REAL;
-  v.real_val = val;
-  return v;
-}
-
-static tg3_kv_pair make_kv(mmdgltf_Arena* arena, const char* key, tg3_value val) {
-  tg3_kv_pair p;
-  p.key = make_str(arena, key);
-  p.value = val;
-  return p;
+  out_config->scale = 1.0f;
 }
 
 static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
@@ -198,7 +154,8 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
     morph_maxs = mmdgltf__arena_alloc(arena, vertex_morph_count * sizeof(f64*));
 
     const bool is_rh = (model->config.coordinate_system == MMDGLTF_COORDS_GLTF_RIGHT_HANDED);
-    const f32 scale = model->config.scale > 0.0f ? model->config.scale : 1.0f;
+    const f32 scale =
+      cfg.scale > 0.0f ? cfg.scale : (model->config.scale > 0.0f ? model->config.scale : 1.0f);
 
     for (size_t m = 0; m < vertex_morph_count; ++m) {
       const mmdgltf_PmxMorph* morph = &morphs[vertex_morph_indices[m]];
@@ -467,16 +424,16 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
   const u32 num_attribs = has_skinning ? 5 : 3;
   tg3_str_int_pair* shared_attribs =
     mmdgltf__arena_alloc(arena, num_attribs * sizeof(tg3_str_int_pair));
-  shared_attribs[0].key = make_str(arena, "POSITION");
+  shared_attribs[0].key = mmdgltf__tg3_make_str(arena, "POSITION");
   shared_attribs[0].value = (i32)acc_pos;
-  shared_attribs[1].key = make_str(arena, "NORMAL");
+  shared_attribs[1].key = mmdgltf__tg3_make_str(arena, "NORMAL");
   shared_attribs[1].value = (i32)acc_norm;
-  shared_attribs[2].key = make_str(arena, "TEXCOORD_0");
+  shared_attribs[2].key = mmdgltf__tg3_make_str(arena, "TEXCOORD_0");
   shared_attribs[2].value = (i32)acc_uv;
   if (has_skinning) {
-    shared_attribs[3].key = make_str(arena, "JOINTS_0");
+    shared_attribs[3].key = mmdgltf__tg3_make_str(arena, "JOINTS_0");
     shared_attribs[3].value = (i32)acc_joints;
-    shared_attribs[4].key = make_str(arena, "WEIGHTS_0");
+    shared_attribs[4].key = mmdgltf__tg3_make_str(arena, "WEIGHTS_0");
     shared_attribs[4].value = (i32)acc_weights;
   }
 
@@ -487,7 +444,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
     shared_target_counts = mmdgltf__arena_alloc(arena, vertex_morph_count * sizeof(u32));
     for (size_t m = 0; m < vertex_morph_count; ++m) {
       tg3_str_int_pair* target_pair = mmdgltf__arena_alloc(arena, sizeof(tg3_str_int_pair));
-      target_pair->key = make_str(arena, "POSITION");
+      target_pair->key = mmdgltf__tg3_make_str(arena, "POSITION");
       target_pair->value = (i32)morph_accs[m];
       shared_targets[m] = target_pair;
       shared_target_counts[m] = 1;
@@ -511,7 +468,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
   tg3_mesh* meshes = mmdgltf__arena_alloc(arena, sizeof(tg3_mesh));
   memset(meshes, 0, sizeof(tg3_mesh));
-  meshes[0].name = make_str(arena, "ModelMesh");
+  meshes[0].name = mmdgltf__tg3_make_str(arena, "ModelMesh");
   meshes[0].primitives = primitives;
   meshes[0].primitives_count = (u32)material_count;
   if (vertex_morph_count > 0) {
@@ -523,7 +480,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
     tg3_str* target_names = mmdgltf__arena_alloc(arena, vertex_morph_count * sizeof(tg3_str));
     for (size_t m = 0; m < vertex_morph_count; ++m) {
       const mmdgltf_PmxMorph* morph = &morphs[vertex_morph_indices[m]];
-      target_names[m] = make_str(arena, morph->name_jp ? morph->name_jp : "morph");
+      target_names[m] = mmdgltf__tg3_make_str(arena, morph->name_jp ? morph->name_jp : "morph");
     }
     tg3_value target_names_val;
     memset(&target_names_val, 0, sizeof(target_names_val));
@@ -538,7 +495,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
     target_names_val.array_count = (u32)vertex_morph_count;
 
     tg3_kv_pair* mesh_extras_kv = mmdgltf__arena_alloc(arena, sizeof(tg3_kv_pair));
-    mesh_extras_kv[0] = make_kv(arena, "targetNames", target_names_val);
+    mesh_extras_kv[0] = mmdgltf__tg3_make_kv(arena, "targetNames", target_names_val);
 
     tg3_value* mesh_extras = mmdgltf__arena_alloc(arena, sizeof(tg3_value));
     memset(mesh_extras, 0, sizeof(tg3_value));
@@ -564,8 +521,8 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
     for (size_t i = 0; i < image_count; ++i) {
       gltf_images[i].buffer_view = image_to_bv[i];
-      gltf_images[i].mime_type = make_str(arena, images[i].mime_type);
-      gltf_images[i].name = make_str(arena, images[i].path);
+      gltf_images[i].mime_type = mmdgltf__tg3_make_str(arena, images[i].mime_type);
+      gltf_images[i].name = mmdgltf__tg3_make_str(arena, images[i].path);
 
       gltf_textures[i].source = (i32)i;
       gltf_textures[i].sampler = 0;
@@ -578,17 +535,18 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
   tg3_extension unlit_ext;
   memset(&unlit_ext, 0, sizeof(unlit_ext));
-  unlit_ext.name = make_str(arena, "KHR_materials_unlit");
+  unlit_ext.name = mmdgltf__tg3_make_str(arena, "KHR_materials_unlit");
   unlit_ext.value.type = TG3_VALUE_OBJECT;
   unlit_ext.value.object_count = 0;
   unlit_ext.value.object_data = NULL;
 
   for (size_t p = 0; p < material_count; ++p) {
     const mmdgltf_PmxMaterial* mat = &materials[p];
-    gltf_materials[p].name = make_str(arena, mat->name_jp ? mat->name_jp : "Material");
+    gltf_materials[p].name =
+      mmdgltf__tg3_make_str(arena, mat->name_jp ? mat->name_jp : "Material");
     gltf_materials[p].double_sided = (mat->draw_flags & MMDGLTF_MATERIAL_DOUBLE_SIDED) ? 1 : 0;
-    gltf_materials[p].alpha_mode =
-      mat->diffuse.a < 1.0f ? make_str(arena, "BLEND") : make_str(arena, "OPAQUE");
+    gltf_materials[p].alpha_mode = mat->diffuse.a < 1.0f ? mmdgltf__tg3_make_str(arena, "BLEND")
+                                                         : mmdgltf__tg3_make_str(arena, "OPAQUE");
     gltf_materials[p].alpha_cutoff = 0.5;
 
     gltf_materials[p].pbr_metallic_roughness.base_color_factor[0] = mat->diffuse.r;
@@ -630,7 +588,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
     nodes[n].rotation[3] = 1.0;
   }
 
-  nodes[0].name = make_str(arena, "Model");
+  nodes[0].name = mmdgltf__tg3_make_str(arena, "Model");
   nodes[0].mesh = 0;
   nodes[0].skin = has_skinning ? 0 : -1;
 
@@ -669,7 +627,8 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
     for (size_t b = 0; b < bone_count; ++b) {
       const size_t n_idx = b + 1;
-      nodes[n_idx].name = make_str(arena, bones[b].name_jp ? bones[b].name_jp : "Bone");
+      nodes[n_idx].name =
+        mmdgltf__tg3_make_str(arena, bones[b].name_jp ? bones[b].name_jp : "Bone");
       nodes[n_idx].mesh = -1;
       nodes[n_idx].skin = -1;
       nodes[n_idx].camera = -1;
@@ -702,7 +661,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
   if (has_skinning) {
     skins = mmdgltf__arena_alloc(arena, sizeof(tg3_skin));
     memset(skins, 0, sizeof(tg3_skin));
-    skins[0].name = make_str(arena, "Armature");
+    skins[0].name = mmdgltf__tg3_make_str(arena, "Armature");
     skins[0].inverse_bind_matrices = (i32)acc_ibm;
     skins[0].skeleton = -1;
 
@@ -728,7 +687,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
   tg3_scene* scenes = mmdgltf__arena_alloc(arena, sizeof(tg3_scene));
   memset(scenes, 0, sizeof(tg3_scene));
-  scenes[0].name = make_str(arena, "Scene");
+  scenes[0].name = mmdgltf__tg3_make_str(arena, "Scene");
   scenes[0].nodes = scene_nodes;
   scenes[0].nodes_count = (u32)scene_nodes_count;
 
@@ -749,12 +708,17 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
       for (size_t i = 0; i < rigid_body_count; ++i) {
         const mmdgltf_PmxRigidBody* rb = &rigid_bodies[i];
         tg3_kv_pair* rb_kv = mmdgltf__arena_alloc(arena, 6 * sizeof(tg3_kv_pair));
-        rb_kv[0] = make_kv(arena, "name", make_str_value(arena, rb->name_jp));
-        rb_kv[1] = make_kv(arena, "bone_index", make_int_value(rb->bone_index));
-        rb_kv[2] = make_kv(arena, "shape_type", make_int_value(rb->shape_type));
-        rb_kv[3] = make_kv(arena, "mass", make_real_value(rb->mass));
-        rb_kv[4] = make_kv(arena, "collision_group", make_int_value(rb->collision_group));
-        rb_kv[5] = make_kv(arena, "physics_mode", make_int_value(rb->physics_mode));
+        rb_kv[0] =
+          mmdgltf__tg3_make_kv(arena, "name", mmdgltf__tg3_make_str_value(arena, rb->name_jp));
+        rb_kv[1] =
+          mmdgltf__tg3_make_kv(arena, "bone_index", mmdgltf__tg3_make_int_value(rb->bone_index));
+        rb_kv[2] =
+          mmdgltf__tg3_make_kv(arena, "shape_type", mmdgltf__tg3_make_int_value(rb->shape_type));
+        rb_kv[3] = mmdgltf__tg3_make_kv(arena, "mass", mmdgltf__tg3_make_real_value(rb->mass));
+        rb_kv[4] = mmdgltf__tg3_make_kv(arena, "collision_group",
+                                        mmdgltf__tg3_make_int_value(rb->collision_group));
+        rb_kv[5] = mmdgltf__tg3_make_kv(arena, "physics_mode",
+                                        mmdgltf__tg3_make_int_value(rb->physics_mode));
 
         rb_items[i].type = TG3_VALUE_OBJECT;
         rb_items[i].object_data = rb_kv;
@@ -762,7 +726,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
       }
       rb_arr.array_data = rb_items;
       rb_arr.array_count = (u32)rigid_body_count;
-      mmd_pairs[mmd_pairs_count++] = make_kv(arena, "rigid_bodies", rb_arr);
+      mmd_pairs[mmd_pairs_count++] = mmdgltf__tg3_make_kv(arena, "rigid_bodies", rb_arr);
     }
 
     if (joint_count > 0) {
@@ -774,10 +738,13 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
       for (size_t i = 0; i < joint_count; ++i) {
         const mmdgltf_PmxJoint* jt = &joints[i];
         tg3_kv_pair* j_kv = mmdgltf__arena_alloc(arena, 4 * sizeof(tg3_kv_pair));
-        j_kv[0] = make_kv(arena, "name", make_str_value(arena, jt->name_jp));
-        j_kv[1] = make_kv(arena, "src_rigid", make_int_value(jt->src_rigid));
-        j_kv[2] = make_kv(arena, "dest_rigid", make_int_value(jt->dest_rigid));
-        j_kv[3] = make_kv(arena, "type", make_int_value(jt->type));
+        j_kv[0] =
+          mmdgltf__tg3_make_kv(arena, "name", mmdgltf__tg3_make_str_value(arena, jt->name_jp));
+        j_kv[1] =
+          mmdgltf__tg3_make_kv(arena, "src_rigid", mmdgltf__tg3_make_int_value(jt->src_rigid));
+        j_kv[2] =
+          mmdgltf__tg3_make_kv(arena, "dest_rigid", mmdgltf__tg3_make_int_value(jt->dest_rigid));
+        j_kv[3] = mmdgltf__tg3_make_kv(arena, "type", mmdgltf__tg3_make_int_value(jt->type));
 
         j_items[i].type = TG3_VALUE_OBJECT;
         j_items[i].object_data = j_kv;
@@ -785,14 +752,14 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
       }
       j_arr.array_data = j_items;
       j_arr.array_count = (u32)joint_count;
-      mmd_pairs[mmd_pairs_count++] = make_kv(arena, "joints", j_arr);
+      mmd_pairs[mmd_pairs_count++] = mmdgltf__tg3_make_kv(arena, "joints", j_arr);
     }
 
     mmd_extras.object_data = mmd_pairs;
     mmd_extras.object_count = mmd_pairs_count;
 
     tg3_kv_pair* scene_extras_kv = mmdgltf__arena_alloc(arena, sizeof(tg3_kv_pair));
-    scene_extras_kv[0] = make_kv(arena, "mmd", mmd_extras);
+    scene_extras_kv[0] = mmdgltf__tg3_make_kv(arena, "mmd", mmd_extras);
 
     tg3_value* scene_extras = mmdgltf__arena_alloc(arena, sizeof(tg3_value));
     memset(scene_extras, 0, sizeof(tg3_value));
@@ -805,8 +772,8 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
   tg3_model gltf_model;
   memset(&gltf_model, 0, sizeof(gltf_model));
 
-  gltf_model.asset.version = make_str(arena, "2.0");
-  gltf_model.asset.generator = make_str(arena, "mmdgltf");
+  gltf_model.asset.version = mmdgltf__tg3_make_str(arena, "2.0");
+  gltf_model.asset.generator = mmdgltf__tg3_make_str(arena, "mmdgltf");
 
   tg3_buffer gltf_buffer;
   memset(&gltf_buffer, 0, sizeof(gltf_buffer));
@@ -850,7 +817,7 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
   if (cfg.unlit) {
     tg3_str* exts_used = mmdgltf__arena_alloc(arena, sizeof(tg3_str));
-    exts_used[0] = make_str(arena, "KHR_materials_unlit");
+    exts_used[0] = mmdgltf__tg3_make_str(arena, "KHR_materials_unlit");
     gltf_model.extensions_used = exts_used;
     gltf_model.extensions_used_count = 1;
   }

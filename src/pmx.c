@@ -754,7 +754,7 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size) {
 static_assert(MMDGLTF_SEEK_CUR == SEEK_CUR, "SEEK_CUR mismatch");
 static_assert(MMDGLTF_SEEK_END == SEEK_END, "SEEK_END mismatch");
 static_assert(MMDGLTF_SEEK_SET == SEEK_SET, "SEEK_SET mismatch");
-static const mmdgltf_StreamFunc file_io = {
+const mmdgltf_StreamFunc mmdgltf__file_io = {
   .read = (PFN_mmdgltf_read_func)fread,
   .seek = (PFN_mmdgltf_seek_func)fseek,
   .tell = (PFN_mmdgltf_tell_func)ftell,
@@ -779,7 +779,7 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_filen(const char* path, size_t path_len
     return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_IO);
   }
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_stream(&file_io, f);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_stream(&mmdgltf__file_io, f);
   fclose(f);
   if (MMDGLTF_CHECK(pmx) == MMDGLTF_OK && pmx) {
     size_t last_slash = (size_t)-1;

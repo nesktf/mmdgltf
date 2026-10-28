@@ -32,6 +32,7 @@ set(MMDGLTF_SOURCES
   "${MMDGLTF_SOURCE_DIR}/image.c"
   "${MMDGLTF_SOURCE_DIR}/tinygltf/tiny_gltf_v3.c"
   "${MMDGLTF_SOURCE_DIR}/export.c"
+  "${MMDGLTF_SOURCE_DIR}/fastpath.c"
 )
 list(APPEND MMDGLTF_INCLUDE ${MMDGLTF_INCLUDE_DIR})
 set(MMDGLTF_HEADERS "${MMDGLTF_INCLUDE_DIR}/mmdgltf/mmdgltf.h")

@@ -3,6 +3,7 @@
 
 #define MMDGLTF__INTERNAL
 #include "../include/mmdgltf/mmdgltf.h"
+#include "tinygltf/tiny_gltf_v3.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -76,6 +77,12 @@ void* mmdgltf__arena_alloc(mmdgltf_Arena* arena, size_t size);
 char* mmdgltf__arena_strndup(mmdgltf_Arena* arena, const char* str, size_t len);
 void mmdgltf__arena_destroy(mmdgltf_Arena* arena);
 
+tg3_str mmdgltf__tg3_make_str(mmdgltf_Arena* arena, const char* s);
+tg3_value mmdgltf__tg3_make_str_value(mmdgltf_Arena* arena, const char* s);
+tg3_value mmdgltf__tg3_make_int_value(i64 val);
+tg3_value mmdgltf__tg3_make_real_value(f64 val);
+tg3_kv_pair mmdgltf__tg3_make_kv(mmdgltf_Arena* arena, const char* key, tg3_value val);
+
 typedef struct mmdgltf_Stream {
   mmdgltf_StreamFunc func;
   void* src;
@@ -112,6 +119,7 @@ int mmdgltf__mem_seek(mmdgltf__MemStream* m, long offset, int origin);
 long mmdgltf__mem_tell(mmdgltf__MemStream* m);
 int mmdgltf__mem_eof(mmdgltf__MemStream* m);
 extern const mmdgltf_StreamFunc mmdgltf__mem_io;
+extern const mmdgltf_StreamFunc mmdgltf__file_io;
 
 struct mmdgltf_Pmx_T {
   mmdgltf_Arena* arena;
