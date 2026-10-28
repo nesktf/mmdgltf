@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
-
 static void test_expected_special_members() {
   mmdgltf::Expected<int> e1;
   assert(e1.has_value());
@@ -104,7 +102,7 @@ static void test_expected_monadic_operations() {
 }
 
 static void test_pmx_model_loading_and_getters() {
-  auto exp_model = mmdgltf::PmxModel::load_file(model_path);
+  auto exp_model = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_NITORI_PMX);
   assert(exp_model.has_value());
   assert(!exp_model->empty());
   assert(exp_model->raw() != nullptr);
@@ -181,7 +179,7 @@ static void test_pmx_model_loading_and_getters() {
   assert(!assigned_model.empty());
   assert(moved_model.empty());
 
-  mmdgltf::PmxModel throw_model(model_path);
+  mmdgltf::PmxModel throw_model(MMDGLTF_TEST_NITORI_PMX);
   assert(!throw_model.empty());
   bool threw = false;
   try {
@@ -193,11 +191,11 @@ static void test_pmx_model_loading_and_getters() {
   }
   assert(threw);
 
-  std::string path_str(model_path);
+  std::string path_str(MMDGLTF_TEST_NITORI_PMX);
   auto exp_filen = mmdgltf::PmxModel::load_filen(path_str.data(), path_str.size());
   assert(exp_filen.has_value());
 
-  FILE* f = fopen(model_path, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   assert(f != nullptr);
   fseek(f, 0, SEEK_END);
   long sz = ftell(f);
@@ -209,7 +207,7 @@ static void test_pmx_model_loading_and_getters() {
   auto exp_mem = mmdgltf::PmxModel::load_memory(buf.data(), buf.size());
   assert(exp_mem.has_value());
 
-  f = fopen(model_path, "rb");
+  f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   mmdgltf_StreamFunc sfunc = {
     [](void* b, size_t s, size_t n, void* src) { return fread(b, s, n, (FILE*)src); },
     [](void* src, long off, int org) { return fseek((FILE*)src, off, org); },
@@ -222,7 +220,7 @@ static void test_pmx_model_loading_and_getters() {
 }
 
 static void test_gpu_model_runtime() {
-  auto exp_pmx = mmdgltf::PmxModel::load_file(model_path);
+  auto exp_pmx = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_NITORI_PMX);
   assert(exp_pmx.has_value());
 
   mmdgltf_ModelConfig cfg;
@@ -294,10 +292,10 @@ static void test_gpu_model_runtime() {
 
 static void test_fastpath_cpp() {
   const char* out_file = "/tmp/test_cpp_fastpath.glb";
-  auto status = mmdgltf::convert_pmx_file(model_path, out_file);
+  auto status = mmdgltf::convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_file);
   assert(status == MMDGLTF_OK);
 
-  FILE* f = fopen(model_path, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   assert(f != nullptr);
   fseek(f, 0, SEEK_END);
   long fsz = ftell(f);
@@ -314,7 +312,7 @@ static void test_fastpath_cpp() {
          (*glb_res)[3] == 'F');
 
   const char* out_gltf = "/tmp/test_cpp_fastpath.gltf";
-  auto status_gltf = mmdgltf::convert_pmx_to_gltf_file(model_path, out_gltf);
+  auto status_gltf = mmdgltf::convert_pmx_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_gltf);
   assert(status_gltf == MMDGLTF_OK);
   remove("/tmp/test_cpp_fastpath.gltf");
   remove("/tmp/test_cpp_fastpath.bin");

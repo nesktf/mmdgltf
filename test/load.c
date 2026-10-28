@@ -3,13 +3,11 @@
 
 #include <stdio.h>
 
-static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
-
 static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
@@ -149,7 +147,7 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   mmdgltf_pmx_destroy(pmx);
 
   // same thing with non null terminated string
-  pmx = mmdgltf_pmx_load_filen(model_path, strlen(model_path));
+  pmx = mmdgltf_pmx_load_filen(MMDGLTF_TEST_NITORI_PMX, strlen(MMDGLTF_TEST_NITORI_PMX));
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
@@ -169,7 +167,7 @@ static MunitResult test_load_pmx_stream(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* f = fopen(model_path, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   munit_assert_ptr_not_null(f);
 
   const mmdgltf_StreamFunc func = {
@@ -197,7 +195,7 @@ static MunitResult test_load_pmx_memory(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* f = fopen(model_path, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   munit_assert_ptr_not_null(f);
 
   fseek(f, 0, SEEK_END);
@@ -301,7 +299,107 @@ static MunitResult test_load_pmd_file(const MunitParameter* params, void* data) 
     munit_assert_uint32(indices[i], <, 9036);
   }
 
+  const mmdgltf_PmxMaterial* materials = NULL;
+  size_t material_count = 0;
+  ret = mmdgltf_pmx_materials(pmx, &materials, &material_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(material_count, ==, 17);
+  munit_assert_ptr_not_null(materials);
+  size_t total_mat_indices = 0;
+  for (size_t i = 0; i < material_count; ++i) {
+    total_mat_indices += materials[i].index_count;
+  }
+  munit_assert_size(total_mat_indices, ==, 44991);
+  munit_assert_int32(materials[5].texture_index, >=, 0);
+
+  const mmdgltf_PmxTexture* textures = NULL;
+  size_t texture_count = 0;
+  ret = mmdgltf_pmx_textures(pmx, &textures, &texture_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(texture_count, >=, 1);
+  munit_assert_ptr_not_null(textures);
+  munit_assert_string_equal(textures[materials[5].texture_index].path, "eye2.bmp");
+
+  const mmdgltf_PmxBone* bones = NULL;
+  size_t bone_count = 0;
+  ret = mmdgltf_pmx_bones(pmx, &bones, &bone_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(bone_count, ==, 122);
+  munit_assert_ptr_not_null(bones);
+  munit_assert_int32(bones[83].ik_target_index, ==, 40);
+  munit_assert_uint32(bones[83].ik_link_count, ==, 2);
+  munit_assert_ptr_not_null(bones[83].ik_links);
+  munit_assert_int(bones[83].ik_links[0].has_limits, ==, 1);
+  munit_assert_float(bones[83].ik_links[0].min_angle.x, <, -3.14f);
+
+  const mmdgltf_PmxMorph* morphs = NULL;
+  size_t morph_count = 0;
+  ret = mmdgltf_pmx_morphs(pmx, &morphs, &morph_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(morph_count, ==, 15);
+  munit_assert_ptr_not_null(morphs);
+  munit_assert_string_equal(morphs[0].name_jp, "真面目");
+  munit_assert_int(morphs[0].category, ==, MMDGLTF_MORPH_CATEGORY_EYEBROW);
+  munit_assert_int(morphs[0].type, ==, MMDGLTF_MORPH_VERTEX);
+  munit_assert_uint32(morphs[0].offset_count, ==, 34);
+  munit_assert_ptr_not_null(morphs[0].vertex_offsets);
+  munit_assert_uint32(morphs[0].vertex_offsets[0].vertex_index, <, 9036);
+
+  const mmdgltf_PmxRigidBody* rigids = NULL;
+  size_t rigid_count = 0;
+  ret = mmdgltf_pmx_rigid_bodies(pmx, &rigids, &rigid_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(rigid_count, ==, 45);
+
+  const mmdgltf_PmxJoint* joints = NULL;
+  size_t joint_count = 0;
+  ret = mmdgltf_pmx_joints(pmx, &joints, &joint_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(joint_count, ==, 27);
+
   mmdgltf_pmx_destroy(pmx);
+  return MUNIT_OK;
+}
+
+static MunitResult test_load_pmd_sphere_maps(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const mmdgltf_Pmx metal_pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_METAL_PMD);
+  munit_assert_ptr_not_null(metal_pmx);
+  munit_assert_int(MMDGLTF_CHECK(metal_pmx), ==, MMDGLTF_OK);
+
+  const mmdgltf_PmxMaterial* materials = NULL;
+  size_t material_count = 0;
+  mmdgltf_Status ret = mmdgltf_pmx_materials(metal_pmx, &materials, &material_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(material_count, >=, 1);
+  munit_assert_int(materials[0].sphere_mode, ==, MMDGLTF_SPHERE_MUL);
+  munit_assert_int32(materials[0].sphere_texture_index, >=, 0);
+
+  const mmdgltf_PmxTexture* textures = NULL;
+  size_t texture_count = 0;
+  ret = mmdgltf_pmx_textures(metal_pmx, &textures, &texture_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_string_equal(textures[materials[0].sphere_texture_index].path, "metal.sph");
+
+  mmdgltf_pmx_destroy(metal_pmx);
+
+  const mmdgltf_Pmx luka_pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_LUKA_PMD);
+  munit_assert_ptr_not_null(luka_pmx);
+  munit_assert_int(MMDGLTF_CHECK(luka_pmx), ==, MMDGLTF_OK);
+
+  ret = mmdgltf_pmx_materials(luka_pmx, &materials, &material_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(material_count, ==, 31);
+  munit_assert_int(materials[1].sphere_mode, ==, MMDGLTF_SPHERE_ADD);
+  munit_assert_int32(materials[1].sphere_texture_index, >=, 0);
+
+  ret = mmdgltf_pmx_textures(luka_pmx, &textures, &texture_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_string_equal(textures[materials[1].sphere_texture_index].path, "a2.spa");
+
+  mmdgltf_pmx_destroy(luka_pmx);
   return MUNIT_OK;
 }
 
@@ -365,6 +463,7 @@ static MunitTest tests[] = {
   {"/load/pmx-errors", test_load_pmx_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/load/pmd-file", test_load_pmd_file, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/load/pmd-dammy", test_load_pmd_dammy, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/load/pmd-sphere-maps", test_load_pmd_sphere_maps, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/load/pmd-errors", test_load_pmd_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 };
 

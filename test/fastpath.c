@@ -7,8 +7,6 @@
 #include <string.h>
 #include <time.h>
 
-static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
-
 static double get_time_sec(void) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -19,7 +17,7 @@ static MunitResult test_fastpath_memory(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* f = fopen(model_path, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   munit_assert_ptr_not_null(f);
   fseek(f, 0, SEEK_END);
   long fsz = ftell(f);
@@ -84,7 +82,7 @@ static MunitResult test_fastpath_file(const MunitParameter* params, void* data) 
   UNUSED(data);
 
   const char* out_file = "/tmp/test_nitori_fastpath.glb";
-  mmdgltf_Status st = mmdgltf_convert_pmx_file(model_path, out_file, NULL);
+  mmdgltf_Status st = mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   tg3_model parsed;
@@ -113,7 +111,7 @@ static MunitResult test_fastpath_gltf_file(const MunitParameter* params, void* d
   UNUSED(data);
 
   const char* out_file = "/tmp/test_nitori_fastpath.gltf";
-  mmdgltf_Status st = mmdgltf_convert_pmx_to_gltf_file(model_path, out_file, NULL);
+  mmdgltf_Status st = mmdgltf_convert_pmx_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   FILE* fbin = fopen("/tmp/test_nitori_fastpath.bin", "rb");
@@ -156,10 +154,10 @@ static MunitResult test_fastpath_bone_names(const MunitParameter* params, void* 
   const char* out_jp = "/tmp/test_nitori_jp.glb";
   const char* out_en = "/tmp/test_nitori_en.glb";
 
-  mmdgltf_Status st_jp = mmdgltf_convert_pmx_file(model_path, out_jp, &cfg_jp);
+  mmdgltf_Status st_jp = mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_jp, &cfg_jp);
   munit_assert_int(st_jp, ==, MMDGLTF_OK);
 
-  mmdgltf_Status st_en = mmdgltf_convert_pmx_file(model_path, out_en, &cfg_en);
+  mmdgltf_Status st_en = mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_en, &cfg_en);
   munit_assert_int(st_en, ==, MMDGLTF_OK);
 
   tg3_model parsed_jp, parsed_en;
@@ -207,7 +205,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
   UNUSED(data);
 
   const double t0_std = get_time_sec();
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -235,7 +233,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
   u8* fast_glb_data = NULL;
   size_t fast_glb_size = 0;
 
-  FILE* f = fopen(model_path, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
   munit_assert_ptr_not_null(f);
   fseek(f, 0, SEEK_END);
   long fsz = ftell(f);
@@ -291,7 +289,7 @@ static MunitResult test_fastpath_errors(const MunitParameter* params, void* data
 
   munit_assert_int(mmdgltf_convert_pmx_file(NULL, "/tmp/out.glb", NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_convert_pmx_file(model_path, NULL, NULL), ==,
+  munit_assert_int(mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   u8* out_data = NULL;

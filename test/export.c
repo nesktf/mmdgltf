@@ -6,13 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
-
 static MunitResult test_export_glb_memory_default(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -66,7 +64,7 @@ static MunitResult test_export_glb_file_unlit(const MunitParameter* params, void
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -109,7 +107,7 @@ static MunitResult test_export_gltf_file(const MunitParameter* params, void* dat
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -157,7 +155,7 @@ static MunitResult test_export_errors(const MunitParameter* params, void* data) 
   munit_assert_int(mmdgltf_export_glb_memory(NULL, NULL, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
   mmdgltf_pmx_destroy(pmx);
 
@@ -171,9 +169,54 @@ static MunitResult test_export_errors(const MunitParameter* params, void* data) 
   return MUNIT_OK;
 }
 
+static MunitResult test_export_glb_pmd(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const mmdgltf_Pmx pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_MIKU_PMD);
+  munit_assert_ptr_not_null(pmx);
+
+  const mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
+  mmdgltf_pmx_destroy(pmx);
+  munit_assert_ptr_not_null(model);
+  munit_assert_int(MMDGLTF_CHECK(model), ==, MMDGLTF_OK);
+
+  u8* glb_data = NULL;
+  size_t glb_size = 0;
+  mmdgltf_Status st = mmdgltf_export_glb_memory(model, &glb_data, &glb_size, NULL);
+  munit_assert_int(st, ==, MMDGLTF_OK);
+  munit_assert_ptr_not_null(glb_data);
+  munit_assert_size(glb_size, >, 20);
+
+  tg3_model parsed;
+  memset(&parsed, 0, sizeof(parsed));
+  tg3_error_stack es;
+  tg3_error_stack_init(&es);
+  tg3_parse_options opts;
+  tg3_parse_options_init(&opts);
+
+  tg3_error_code perr = tg3_parse_glb(&parsed, &es, glb_data, glb_size, NULL, 0, &opts);
+  munit_assert_int(perr, ==, TG3_OK);
+  munit_assert_uint32(parsed.meshes_count, ==, 1);
+  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 17);
+  munit_assert_uint32(parsed.materials_count, ==, 17);
+  munit_assert_uint32(parsed.skins_count, ==, 1);
+  munit_assert_uint32(parsed.skins[0].joints_count, ==, 122);
+  munit_assert_uint32(parsed.scenes_count, ==, 1);
+
+  tg3_error_stack_free(&es);
+  tg3_model_free(&parsed);
+
+  mmdgltf_export_free(glb_data, glb_size);
+  mmdgltf_model_destroy(model);
+
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
   {"/export/glb-memory-default", test_export_glb_memory_default, NULL, NULL,
    MUNIT_TEST_OPTION_NONE, NULL},
+  {"/export/glb-pmd", test_export_glb_pmd, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/export/glb-file-unlit", test_export_glb_file_unlit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/export/gltf-file", test_export_gltf_file, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/export/errors", test_export_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
