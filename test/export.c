@@ -105,6 +105,47 @@ static MunitResult test_export_glb_file_unlit(const MunitParameter* params, void
   return MUNIT_OK;
 }
 
+static MunitResult test_export_gltf_file(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  munit_assert_ptr_not_null(pmx);
+
+  mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
+  mmdgltf_pmx_destroy(pmx);
+  munit_assert_ptr_not_null(model);
+
+  const char* out_file = "/tmp/test_nitori_export.gltf";
+  mmdgltf_Status st = mmdgltf_export_gltf_file(model, out_file, NULL);
+  munit_assert_int(st, ==, MMDGLTF_OK);
+
+  FILE* fbin = fopen("/tmp/test_nitori_export.bin", "rb");
+  munit_assert_ptr_not_null(fbin);
+  fclose(fbin);
+
+  tg3_model parsed;
+  memset(&parsed, 0, sizeof(parsed));
+  tg3_error_stack es;
+  tg3_error_stack_init(&es);
+  tg3_parse_options opts;
+  tg3_parse_options_init(&opts);
+
+  tg3_error_code perr = tg3_parse_file(&parsed, &es, out_file, (u32)strlen(out_file), &opts);
+  munit_assert_int(perr, ==, TG3_OK);
+  munit_assert_uint32(parsed.meshes_count, ==, 1);
+  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 47);
+
+  tg3_error_stack_free(&es);
+  tg3_model_free(&parsed);
+
+  remove("/tmp/test_nitori_export.gltf");
+  remove("/tmp/test_nitori_export.bin");
+
+  mmdgltf_model_destroy(model);
+  return MUNIT_OK;
+}
+
 static MunitResult test_export_errors(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
@@ -134,6 +175,7 @@ static MunitTest tests[] = {
   {"/export/glb-memory-default", test_export_glb_memory_default, NULL, NULL,
    MUNIT_TEST_OPTION_NONE, NULL},
   {"/export/glb-file-unlit", test_export_glb_file_unlit, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/export/gltf-file", test_export_gltf_file, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/export/errors", test_export_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 };
 

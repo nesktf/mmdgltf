@@ -77,6 +77,9 @@ void* mmdgltf__arena_alloc(mmdgltf_Arena* arena, size_t size);
 char* mmdgltf__arena_strndup(mmdgltf_Arena* arena, const char* str, size_t len);
 void mmdgltf__arena_destroy(mmdgltf_Arena* arena);
 
+void mmdgltf__derive_bin_paths(mmdgltf_Arena* arena, const char* gltf_path, size_t path_len,
+                               char** out_bin_path, char** out_bin_uri);
+
 tg3_str mmdgltf__tg3_make_str(mmdgltf_Arena* arena, const char* s);
 tg3_value mmdgltf__tg3_make_str_value(mmdgltf_Arena* arena, const char* s);
 tg3_value mmdgltf__tg3_make_int_value(i64 val);

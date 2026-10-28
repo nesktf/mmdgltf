@@ -108,6 +108,100 @@ static MunitResult test_fastpath_file(const MunitParameter* params, void* data) 
   return MUNIT_OK;
 }
 
+static MunitResult test_fastpath_gltf_file(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const char* out_file = "/tmp/test_nitori_fastpath.gltf";
+  mmdgltf_Status st = mmdgltf_convert_pmx_to_gltf_file(model_path, out_file, NULL);
+  munit_assert_int(st, ==, MMDGLTF_OK);
+
+  FILE* fbin = fopen("/tmp/test_nitori_fastpath.bin", "rb");
+  munit_assert_ptr_not_null(fbin);
+  fclose(fbin);
+
+  tg3_model parsed;
+  memset(&parsed, 0, sizeof(parsed));
+  tg3_error_stack es;
+  tg3_error_stack_init(&es);
+  tg3_parse_options opts;
+  tg3_parse_options_init(&opts);
+
+  tg3_error_code perr = tg3_parse_file(&parsed, &es, out_file, (u32)strlen(out_file), &opts);
+  munit_assert_int(perr, ==, TG3_OK);
+  munit_assert_uint32(parsed.meshes_count, ==, 1);
+  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 47);
+  munit_assert_uint32(parsed.materials_count, ==, 47);
+  munit_assert_uint32(parsed.skins_count, ==, 1);
+  munit_assert_uint32(parsed.skins[0].joints_count, ==, 301);
+
+  tg3_error_stack_free(&es);
+  tg3_model_free(&parsed);
+
+  return MUNIT_OK;
+}
+
+static MunitResult test_fastpath_bone_names(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  mmdgltf_ExportConfig cfg_jp;
+  mmdgltf_export_config_default(&cfg_jp);
+  cfg_jp.english_bone_names = 0;
+
+  mmdgltf_ExportConfig cfg_en;
+  mmdgltf_export_config_default(&cfg_en);
+  cfg_en.english_bone_names = 1;
+
+  const char* out_jp = "/tmp/test_nitori_jp.glb";
+  const char* out_en = "/tmp/test_nitori_en.glb";
+
+  mmdgltf_Status st_jp = mmdgltf_convert_pmx_file(model_path, out_jp, &cfg_jp);
+  munit_assert_int(st_jp, ==, MMDGLTF_OK);
+
+  mmdgltf_Status st_en = mmdgltf_convert_pmx_file(model_path, out_en, &cfg_en);
+  munit_assert_int(st_en, ==, MMDGLTF_OK);
+
+  tg3_model parsed_jp, parsed_en;
+  memset(&parsed_jp, 0, sizeof(parsed_jp));
+  memset(&parsed_en, 0, sizeof(parsed_en));
+  tg3_error_stack es;
+  tg3_error_stack_init(&es);
+  tg3_parse_options opts;
+  tg3_parse_options_init(&opts);
+
+  tg3_error_code perr = tg3_parse_file(&parsed_jp, &es, out_jp, (u32)strlen(out_jp), &opts);
+  munit_assert_int(perr, ==, TG3_OK);
+  perr = tg3_parse_file(&parsed_en, &es, out_en, (u32)strlen(out_en), &opts);
+  munit_assert_int(perr, ==, TG3_OK);
+
+  munit_assert_uint32(parsed_jp.skins_count, ==, 1);
+  munit_assert_uint32(parsed_en.skins_count, ==, 1);
+  munit_assert_uint32(parsed_jp.skins[0].joints_count, ==, parsed_en.skins[0].joints_count);
+
+  int differences = 0;
+  for (u32 i = 0; i < parsed_jp.skins[0].joints_count; ++i) {
+    i32 j_jp = parsed_jp.skins[0].joints[i];
+    i32 j_en = parsed_en.skins[0].joints[i];
+    if (j_jp >= 0 && j_en >= 0) {
+      tg3_str name_jp = parsed_jp.nodes[j_jp].name;
+      tg3_str name_en = parsed_en.nodes[j_en].name;
+      if (name_jp.data && name_en.data && !tg3_str_equals(name_jp, name_en)) {
+        differences++;
+      }
+    }
+  }
+  munit_assert_int(differences, >, 0);
+
+  tg3_error_stack_free(&es);
+  tg3_model_free(&parsed_jp);
+  tg3_model_free(&parsed_en);
+  remove(out_jp);
+  remove(out_en);
+
+  return MUNIT_OK;
+}
+
 static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
@@ -225,6 +319,22 @@ static MunitTest tests[] = {
   {
     .name = "/fastpath/file",
     .test = test_fastpath_file,
+    .setup = NULL,
+    .tear_down = NULL,
+    .options = MUNIT_TEST_OPTION_NONE,
+    .parameters = NULL,
+  },
+  {
+    .name = "/fastpath/gltf-file",
+    .test = test_fastpath_gltf_file,
+    .setup = NULL,
+    .tear_down = NULL,
+    .options = MUNIT_TEST_OPTION_NONE,
+    .parameters = NULL,
+  },
+  {
+    .name = "/fastpath/bone-names",
+    .test = test_fastpath_bone_names,
     .setup = NULL,
     .tear_down = NULL,
     .options = MUNIT_TEST_OPTION_NONE,

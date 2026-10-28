@@ -14,13 +14,13 @@ MMDGLTF_API void mmdgltf_export_config_default(mmdgltf_ExportConfig* out_config)
   out_config->export_skinning = 1;
   out_config->export_morphs = 1;
   out_config->export_physics = 1;
+  out_config->english_bone_names = 0;
   out_config->scale = 1.0f;
 }
 
-static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
-                                              const mmdgltf_ExportConfig* config,
-                                              const char* filename, u32 filename_len,
-                                              u8** out_data, size_t* out_size) {
+static mmdgltf_Status build_and_serialize(mmdgltf_Model model, const mmdgltf_ExportConfig* config,
+                                          const char* filename, u32 filename_len, u8** out_data,
+                                          size_t* out_size, bool write_binary) {
   if (!model) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
@@ -627,8 +627,15 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
 
     for (size_t b = 0; b < bone_count; ++b) {
       const size_t n_idx = b + 1;
-      nodes[n_idx].name =
-        mmdgltf__tg3_make_str(arena, bones[b].name_jp ? bones[b].name_jp : "Bone");
+      const char* bname = NULL;
+      if (cfg.english_bone_names) {
+        bname =
+          (bones[b].name_en && bones[b].name_en[0] != '\0') ? bones[b].name_en : bones[b].name_jp;
+      } else {
+        bname =
+          (bones[b].name_jp && bones[b].name_jp[0] != '\0') ? bones[b].name_jp : bones[b].name_en;
+      }
+      nodes[n_idx].name = mmdgltf__tg3_make_str(arena, bname ? bname : "Bone");
       nodes[n_idx].mesh = -1;
       nodes[n_idx].skin = -1;
       nodes[n_idx].camera = -1;
@@ -822,9 +829,17 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
     gltf_model.extensions_used_count = 1;
   }
 
+  char* bin_path = NULL;
+  char* bin_uri = NULL;
+  if (!write_binary && filename) {
+    mmdgltf__derive_bin_paths(arena, filename, filename_len, &bin_path, &bin_uri);
+    gltf_buffer.uri = mmdgltf__tg3_make_str(arena, bin_uri);
+  }
+
   tg3_write_options write_opts;
   tg3_write_options_init(&write_opts);
-  write_opts.write_binary = 1;
+  write_opts.write_binary = write_binary ? 1 : 0;
+  write_opts.pretty_print = write_binary ? 0 : 1;
   write_opts.embed_buffers = 0;
   write_opts.embed_images = 0;
 
@@ -834,6 +849,17 @@ static mmdgltf_Status build_and_serialize_glb(mmdgltf_Model model,
   tg3_error_code err = TG3_OK;
   if (filename) {
     err = tg3_write_to_file(&gltf_model, &errors, filename, filename_len, &write_opts);
+    if (err == TG3_OK && !write_binary && bin_path) {
+      FILE* bf = fopen(bin_path, "wb");
+      if (!bf) {
+        err = TG3_ERR_FILE_WRITE;
+      } else {
+        if (bw.size > 0 && fwrite(bw.data, 1, bw.size, bf) != bw.size) {
+          err = TG3_ERR_FILE_WRITE;
+        }
+        fclose(bf);
+      }
+    }
   } else if (out_data && out_size) {
     u64 written_size = 0;
     err = tg3_write_to_memory(&gltf_model, &errors, out_data, &written_size, &write_opts);
@@ -860,7 +886,7 @@ MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_filen(mmdgltf_Model model, const c
   if (!filename || filename_len == 0) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
-  return build_and_serialize_glb(model, config, filename, (u32)filename_len, NULL, NULL);
+  return build_and_serialize(model, config, filename, (u32)filename_len, NULL, NULL, true);
 }
 
 MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_file(mmdgltf_Model model, const char* filename,
@@ -871,13 +897,30 @@ MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_file(mmdgltf_Model model, const ch
   return mmdgltf_export_glb_filen(model, filename, strlen(filename), config);
 }
 
+MMDGLTF_API mmdgltf_Status mmdgltf_export_gltf_filen(mmdgltf_Model model, const char* filename,
+                                                     size_t filename_len,
+                                                     const mmdgltf_ExportConfig* config) {
+  if (!filename || filename_len == 0) {
+    return MMDGLTF_ERROR_INVALID_ARGUMENT;
+  }
+  return build_and_serialize(model, config, filename, (u32)filename_len, NULL, NULL, false);
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_export_gltf_file(mmdgltf_Model model, const char* filename,
+                                                    const mmdgltf_ExportConfig* config) {
+  if (!filename) {
+    return MMDGLTF_ERROR_INVALID_ARGUMENT;
+  }
+  return mmdgltf_export_gltf_filen(model, filename, strlen(filename), config);
+}
+
 MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_memory(mmdgltf_Model model, uint8_t** out_data,
                                                      size_t* out_size,
                                                      const mmdgltf_ExportConfig* config) {
   if (!out_data || !out_size) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
-  return build_and_serialize_glb(model, config, NULL, 0, out_data, out_size);
+  return build_and_serialize(model, config, NULL, 0, out_data, out_size, true);
 }
 
 MMDGLTF_API void mmdgltf_export_free(uint8_t* data, size_t size) {

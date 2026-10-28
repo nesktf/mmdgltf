@@ -23,10 +23,10 @@ static char* extract_dir(mmdgltf_Arena* arena, const char* path, size_t len) {
   return mmdgltf__arena_strndup(arena, path, last_slash);
 }
 
-static mmdgltf_Status convert_stream_to_glb(mmdgltf_Stream* stream, const char* base_dir,
-                                            const mmdgltf_ExportConfig* config,
-                                            const char* filename, u32 filename_len, u8** out_data,
-                                            size_t* out_size) {
+static mmdgltf_Status convert_stream(mmdgltf_Stream* stream, const char* base_dir,
+                                     const mmdgltf_ExportConfig* config, const char* filename,
+                                     u32 filename_len, u8** out_data, size_t* out_size,
+                                     bool write_binary) {
   mmdgltf_Status err = MMDGLTF_OK;
   mmdgltf_Arena* arena = NULL;
   mmdgltf__ByteVec bw;
@@ -1020,8 +1020,15 @@ static mmdgltf_Status convert_stream_to_glb(mmdgltf_Stream* stream, const char* 
 
     for (size_t b = 0; b < b_count; ++b) {
       const size_t n_idx = b + 1;
-      nodes[n_idx].name =
-        mmdgltf__tg3_make_str(arena, bones[b].name_jp ? bones[b].name_jp : "Bone");
+      const char* bname = NULL;
+      if (cfg.english_bone_names) {
+        bname =
+          (bones[b].name_en && bones[b].name_en[0] != '\0') ? bones[b].name_en : bones[b].name_jp;
+      } else {
+        bname =
+          (bones[b].name_jp && bones[b].name_jp[0] != '\0') ? bones[b].name_jp : bones[b].name_en;
+      }
+      nodes[n_idx].name = mmdgltf__tg3_make_str(arena, bname ? bname : "Bone");
       nodes[n_idx].mesh = -1;
       nodes[n_idx].skin = -1;
       nodes[n_idx].camera = -1;
@@ -1205,9 +1212,17 @@ static mmdgltf_Status convert_stream_to_glb(mmdgltf_Stream* stream, const char* 
     gltf_model.extensions_used_count = 1;
   }
 
+  char* bin_path = NULL;
+  char* bin_uri = NULL;
+  if (!write_binary && filename) {
+    mmdgltf__derive_bin_paths(arena, filename, filename_len, &bin_path, &bin_uri);
+    gltf_buffer.uri = mmdgltf__tg3_make_str(arena, bin_uri);
+  }
+
   tg3_write_options write_opts;
   tg3_write_options_init(&write_opts);
-  write_opts.write_binary = 1;
+  write_opts.write_binary = write_binary ? 1 : 0;
+  write_opts.pretty_print = write_binary ? 0 : 1;
   write_opts.embed_buffers = 0;
   write_opts.embed_images = 0;
 
@@ -1217,6 +1232,17 @@ static mmdgltf_Status convert_stream_to_glb(mmdgltf_Stream* stream, const char* 
   tg3_error_code status = TG3_OK;
   if (filename) {
     status = tg3_write_to_file(&gltf_model, &errors, filename, filename_len, &write_opts);
+    if (status == TG3_OK && !write_binary && bin_path) {
+      FILE* bf = fopen(bin_path, "wb");
+      if (!bf) {
+        status = TG3_ERR_FILE_WRITE;
+      } else {
+        if (bw.size > 0 && fwrite(bw.data, 1, bw.size, bf) != bw.size) {
+          status = TG3_ERR_FILE_WRITE;
+        }
+        fclose(bf);
+      }
+    }
   } else if (out_data && out_size) {
     u64 written_size = 0;
     status = tg3_write_to_memory(&gltf_model, &errors, out_data, &written_size, &write_opts);
@@ -1269,7 +1295,7 @@ MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_filen(const char* pmx_path, size_
   stream.status = MMDGLTF_OK;
 
   const mmdgltf_Status st =
-    convert_stream_to_glb(&stream, base_dir, config, glb_path, (u32)glb_path_len, NULL, NULL);
+    convert_stream(&stream, base_dir, config, glb_path, (u32)glb_path_len, NULL, NULL, true);
 
   fclose(f);
   if (dir_arena) {
@@ -1284,6 +1310,57 @@ MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_file(const char* pmx_path, const 
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
   return mmdgltf_convert_pmx_filen(pmx_path, strlen(pmx_path), glb_path, strlen(glb_path), config);
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_to_gltf_filen(const char* pmx_path,
+                                                             size_t pmx_path_len,
+                                                             const char* gltf_path,
+                                                             size_t gltf_path_len,
+                                                             const mmdgltf_ExportConfig* config) {
+  if (!pmx_path || pmx_path_len == 0 || !gltf_path || gltf_path_len == 0) {
+    return MMDGLTF_ERROR_INVALID_ARGUMENT;
+  }
+
+  char* null_pmx = MMDGLTF_MALLOC(pmx_path_len + 1);
+  if (!null_pmx) {
+    return MMDGLTF_ERROR_OUT_OF_MEMORY;
+  }
+  memcpy(null_pmx, pmx_path, pmx_path_len);
+  null_pmx[pmx_path_len] = '\0';
+
+  FILE* f = fopen(null_pmx, "rb");
+  if (!f) {
+    MMDGLTF_FREE(null_pmx, pmx_path_len + 1);
+    return MMDGLTF_ERROR_IO;
+  }
+
+  mmdgltf_Arena* dir_arena = mmdgltf__arena_create(4096);
+  char* base_dir = extract_dir(dir_arena, null_pmx, pmx_path_len);
+  MMDGLTF_FREE(null_pmx, pmx_path_len + 1);
+
+  mmdgltf_Stream stream;
+  stream.func = mmdgltf__file_io;
+  stream.src = f;
+  stream.status = MMDGLTF_OK;
+
+  const mmdgltf_Status st =
+    convert_stream(&stream, base_dir, config, gltf_path, (u32)gltf_path_len, NULL, NULL, false);
+
+  fclose(f);
+  if (dir_arena) {
+    mmdgltf__arena_destroy(dir_arena);
+  }
+  return st;
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_to_gltf_file(const char* pmx_path,
+                                                            const char* gltf_path,
+                                                            const mmdgltf_ExportConfig* config) {
+  if (!pmx_path || !gltf_path) {
+    return MMDGLTF_ERROR_INVALID_ARGUMENT;
+  }
+  return mmdgltf_convert_pmx_to_gltf_filen(pmx_path, strlen(pmx_path), gltf_path,
+                                           strlen(gltf_path), config);
 }
 
 MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_memory(const uint8_t* pmx_data, size_t pmx_size,
@@ -1304,5 +1381,5 @@ MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_memory(const uint8_t* pmx_data, s
   stream.src = &mem;
   stream.status = MMDGLTF_OK;
 
-  return convert_stream_to_glb(&stream, NULL, config, NULL, 0, out_glb_data, out_glb_size);
+  return convert_stream(&stream, NULL, config, NULL, 0, out_glb_data, out_glb_size, true);
 }

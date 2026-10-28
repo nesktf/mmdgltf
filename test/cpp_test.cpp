@@ -312,6 +312,12 @@ static void test_fastpath_cpp() {
   assert(glb_res->size() > 20);
   assert((*glb_res)[0] == 'g' && (*glb_res)[1] == 'l' && (*glb_res)[2] == 'T' &&
          (*glb_res)[3] == 'F');
+
+  const char* out_gltf = "/tmp/test_cpp_fastpath.gltf";
+  auto status_gltf = mmdgltf::convert_pmx_to_gltf_file(model_path, out_gltf);
+  assert(status_gltf == MMDGLTF_OK);
+  remove("/tmp/test_cpp_fastpath.gltf");
+  remove("/tmp/test_cpp_fastpath.bin");
 }
 
 int main() {

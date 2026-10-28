@@ -71,6 +71,49 @@ tg3_kv_pair mmdgltf__tg3_make_kv(mmdgltf_Arena* arena, const char* key, tg3_valu
   return p;
 }
 
+void mmdgltf__derive_bin_paths(mmdgltf_Arena* arena, const char* gltf_path, size_t path_len,
+                               char** out_bin_path, char** out_bin_uri) {
+  if (!arena || !gltf_path || path_len == 0 || !out_bin_path || !out_bin_uri) {
+    return;
+  }
+  size_t last_slash = path_len;
+  for (size_t i = path_len; i > 0; --i) {
+    if (gltf_path[i - 1] == '/' || gltf_path[i - 1] == '\\') {
+      last_slash = i - 1;
+      break;
+    }
+  }
+
+  const char* file_part = (last_slash < path_len) ? (gltf_path + last_slash + 1) : gltf_path;
+  const size_t file_len = (last_slash < path_len) ? (path_len - (last_slash + 1)) : path_len;
+
+  size_t stem_len = file_len;
+  for (size_t i = file_len; i > 0; --i) {
+    if (file_part[i - 1] == '.') {
+      stem_len = i - 1;
+      break;
+    }
+  }
+
+  const size_t uri_len = stem_len + 4;
+  char* uri = mmdgltf__arena_alloc(arena, uri_len + 1);
+  memcpy(uri, file_part, stem_len);
+  memcpy(uri + stem_len, ".bin", 5);
+  *out_bin_uri = uri;
+
+  if (last_slash < path_len) {
+    const size_t dir_len = last_slash + 1;
+    const size_t full_len = dir_len + stem_len + 4;
+    char* full = mmdgltf__arena_alloc(arena, full_len + 1);
+    memcpy(full, gltf_path, dir_len);
+    memcpy(full + dir_len, file_part, stem_len);
+    memcpy(full + dir_len + stem_len, ".bin", 5);
+    *out_bin_path = full;
+  } else {
+    *out_bin_path = uri;
+  }
+}
+
 static void* mmd_alloc(size_t sz, void* user) {
   UNUSED(user);
   return malloc(sz);

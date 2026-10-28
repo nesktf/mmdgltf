@@ -949,6 +949,11 @@ public:
     return mmdgltf_export_glb_file(_model, filename, config);
   }
 
+  mmdgltf_Status export_gltf_file(const char* filename,
+                                  const ExportConfig* config = nullptr) const noexcept {
+    return mmdgltf_export_gltf_file(_model, filename, config);
+  }
+
   Expected<std::vector<uint8_t>>
   export_glb_memory(const ExportConfig* config = nullptr) const noexcept {
     uint8_t* data = nullptr;
@@ -984,6 +989,18 @@ inline Status convert_pmx_filen(const char* pmx_path, size_t pmx_path_len, const
                                 size_t glb_path_len,
                                 const ExportConfig* config = nullptr) noexcept {
   return mmdgltf_convert_pmx_filen(pmx_path, pmx_path_len, glb_path, glb_path_len, config);
+}
+
+inline Status convert_pmx_to_gltf_file(const char* pmx_path, const char* gltf_path,
+                                       const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_pmx_to_gltf_file(pmx_path, gltf_path, config);
+}
+
+inline Status convert_pmx_to_gltf_filen(const char* pmx_path, size_t pmx_path_len,
+                                        const char* gltf_path, size_t gltf_path_len,
+                                        const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_pmx_to_gltf_filen(pmx_path, pmx_path_len, gltf_path, gltf_path_len,
+                                           config);
 }
 
 inline Expected<std::vector<uint8_t>>

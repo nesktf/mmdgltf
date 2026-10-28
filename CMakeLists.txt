@@ -2,13 +2,14 @@ cmake_minimum_required(VERSION 3.25)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(MMDGLTF_VER_MAJ 0)
-set(MMDGLTF_VER_MIN 0)
-set(MMDGLTF_VER_REV 1)
+set(MMDGLTF_VER_MIN 1)
+set(MMDGLTF_VER_REV 0)
 
 set(MMDGLTF_VER "${MMDGLTF_VER_MAJ}.${MMDGLTF_VER_MIN}.${MMDGLTF_VER_REV}")
 
 option(MMDGLTF_SHARED_BUILD "Shared object build" OFF)
 option(MMDGLTF_BUILD_TESTS "Build tests" OFF)
+option(MMDGLTF_BUILD_CLI "Build CLI utility" ON)
 
 set(MMDGLTF_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(MMDGLTF_SOURCE_DIR "${MMDGLTF_DIR}/src")
@@ -20,7 +21,7 @@ else()
   set(MMDGLTF_BUILD_TYPE STATIC)
 endif()
 
-message(STATUS "mmdgltf: Setting up version ${MMDGLTF_VER_STR}")
+message(STATUS "mmdgltf: Setting up version ${MMDGLTF_VER}")
 project(mmdgltf VERSION ${MMDGLTF_VER} LANGUAGES C)
 
 set(MMDGLTF_SOURCES
@@ -52,7 +53,16 @@ list(APPEND MMDGLTF_DEFS -DTINYGLTF3_ENABLE_FS)
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${MMDGLTF_DEFS})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX "d")
-set_property(TARGET mmdgltf PROPERTY C_STANDARD 11)
+set_property(TARGET ${PROJECT_NAME} PROPERTY C_STANDARD 11)
+
+if (MMDGLTF_BUILD_CLI)
+  add_executable(mmdgltf-cli "${MMDGLTF_SOURCE_DIR}/cli.c")
+  target_link_libraries(mmdgltf-cli PRIVATE ${PROJECT_NAME})
+  set_property(TARGET mmdgltf-cli PROPERTY C_STANDARD 11)
+  if (UNIX AND NOT APPLE)
+    target_link_libraries(mmdgltf-cli PRIVATE m)
+  endif()
+endif()
 
 if (MMDGLTF_BUILD_TESTS)
   message(STATUS "mmdgltf: Building tests")
