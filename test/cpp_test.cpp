@@ -284,6 +284,12 @@ static void test_gpu_model_runtime() {
   mmdgltf::Model moved_model(std::move(*exp_model));
   assert(!moved_model.empty());
   assert(exp_model->empty());
+
+  auto exp_glb = moved_model.export_glb_memory();
+  assert(exp_glb.has_value());
+  assert(exp_glb->size() > 20);
+  assert((*exp_glb)[0] == 'g' && (*exp_glb)[1] == 'l' && (*exp_glb)[2] == 'T' &&
+         (*exp_glb)[3] == 'F');
 }
 
 int main() {

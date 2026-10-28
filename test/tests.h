@@ -12,5 +12,6 @@ typedef struct TestData {
 extern TestData load_tests;
 extern TestData stream_tests;
 extern TestData model_tests;
+extern TestData export_tests;
 
 #endif // MMDGLTF_TESTS_H

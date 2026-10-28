@@ -30,6 +30,8 @@ set(MMDGLTF_SOURCES
   "${MMDGLTF_SOURCE_DIR}/pmx.c"
   "${MMDGLTF_SOURCE_DIR}/model.c"
   "${MMDGLTF_SOURCE_DIR}/image.c"
+  "${MMDGLTF_SOURCE_DIR}/tinygltf/tiny_gltf_v3.c"
+  "${MMDGLTF_SOURCE_DIR}/export.c"
 )
 list(APPEND MMDGLTF_INCLUDE ${MMDGLTF_INCLUDE_DIR})
 set(MMDGLTF_HEADERS "${MMDGLTF_INCLUDE_DIR}/mmdgltf/mmdgltf.h")
@@ -45,6 +47,7 @@ endif()
 if (MMDGLTF_SHARED_BUILD)
   list(APPEND MMDGLTF_DEFS -DMMDGLTF_SHARED_BUILD)
 endif()
+list(APPEND MMDGLTF_DEFS -DTINYGLTF3_ENABLE_FS)
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${MMDGLTF_DEFS})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES DEBUG_POSTFIX "d")

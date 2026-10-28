@@ -49,6 +49,14 @@ static_assert(sizeof(f32) == 4, "float size mismatch");
 typedef double f64;
 static_assert(sizeof(f64) == 8, "double size mismatch");
 
+typedef struct mmdgltf__ByteVec {
+  u8* data;
+  size_t size;
+  size_t capacity;
+} mmdgltf__ByteVec;
+
+size_t mmdgltf__bytevec_append(mmdgltf__ByteVec* bv, const void* src, size_t sz);
+
 typedef struct mmdgltf_ArenaBlock {
   u8* base;
   size_t used;

@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace mmdgltf {
 
@@ -40,6 +41,7 @@ using PmxDisplayElement = mmdgltf_PmxDisplayElement;
 using PmxRigidBody = mmdgltf_PmxRigidBody;
 using PmxJoint = mmdgltf_PmxJoint;
 using Image = mmdgltf_Image;
+using ExportConfig = mmdgltf_ExportConfig;
 using CoordinateSystem = mmdgltf_CoordinateSystem;
 using ModelConfig = mmdgltf_ModelConfig;
 using VertexBuffers = mmdgltf_VertexBuffers;
@@ -940,6 +942,23 @@ public:
       return {unexpect, err};
     }
     return {in_place, ptr, count};
+  }
+
+  mmdgltf_Status export_glb_file(const char* filename,
+                                 const ExportConfig* config = nullptr) const noexcept {
+    return mmdgltf_export_glb_file(_model, filename, config);
+  }
+
+  Expected<std::vector<uint8_t>>
+  export_glb_memory(const ExportConfig* config = nullptr) const noexcept {
+    uint8_t* data = nullptr;
+    size_t size = 0;
+    if (auto err = mmdgltf_export_glb_memory(_model, &data, &size, config); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    std::vector<uint8_t> result(data, data + size);
+    mmdgltf_export_free(data, size);
+    return {in_place, std::move(result)};
   }
 
 private:
