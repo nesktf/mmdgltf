@@ -574,7 +574,7 @@ private:
 class PmxModel {
 public:
   static Expected<PmxModel> load_file(const char* path) noexcept {
-    auto pmx = mmdgltf_pmx_load_file(path);
+    auto pmx = mmdgltf_load_file(path);
     if (auto err = MMDGLTF_CHECK(pmx); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
@@ -582,7 +582,7 @@ public:
   }
 
   static Expected<PmxModel> load_file(const char* path, size_t path_len) noexcept {
-    auto pmx = mmdgltf_pmx_load_filen(path, path_len);
+    auto pmx = mmdgltf_load_filen(path, path_len);
     if (auto err = MMDGLTF_CHECK(pmx); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
@@ -594,7 +594,7 @@ public:
   }
 
   static Expected<PmxModel> load_memory(const void* data, size_t size) noexcept {
-    auto pmx = mmdgltf_pmx_load_memory(data, size);
+    auto pmx = mmdgltf_load_memory(data, size);
     if (auto err = MMDGLTF_CHECK(pmx); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
@@ -602,7 +602,7 @@ public:
   }
 
   static Expected<PmxModel> load_stream(const mmdgltf_StreamFunc* func, void* src) noexcept {
-    auto pmx = mmdgltf_pmx_load_stream(func, src);
+    auto pmx = mmdgltf_load_stream(func, src);
     if (auto err = MMDGLTF_CHECK(pmx); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
@@ -619,7 +619,7 @@ public:
   explicit PmxModel(mmdgltf_Pmx pmx) noexcept : _pmx(pmx) {}
 
   explicit PmxModel(const char* path) {
-    _pmx = mmdgltf_pmx_load_file(path);
+    _pmx = mmdgltf_load_file(path);
     if (auto err = MMDGLTF_CHECK(_pmx); err != MMDGLTF_OK) {
 #ifdef __cpp_exceptions
       throw Error(err);
@@ -630,7 +630,7 @@ public:
   }
 
   explicit PmxModel(const char* path, size_t path_len) {
-    _pmx = mmdgltf_pmx_load_filen(path, path_len);
+    _pmx = mmdgltf_load_filen(path, path_len);
     if (auto err = MMDGLTF_CHECK(_pmx); err != MMDGLTF_OK) {
 #ifdef __cpp_exceptions
       throw Error(err);
@@ -641,7 +641,7 @@ public:
   }
 
   explicit PmxModel(const void* data, size_t size) {
-    _pmx = mmdgltf_pmx_load_memory(data, size);
+    _pmx = mmdgltf_load_memory(data, size);
     if (auto err = MMDGLTF_CHECK(_pmx); err != MMDGLTF_OK) {
 #ifdef __cpp_exceptions
       throw Error(err);
@@ -652,7 +652,7 @@ public:
   }
 
   explicit PmxModel(const mmdgltf_StreamFunc* func, void* src) {
-    _pmx = mmdgltf_pmx_load_stream(func, src);
+    _pmx = mmdgltf_load_stream(func, src);
     if (auto err = MMDGLTF_CHECK(_pmx); err != MMDGLTF_OK) {
 #ifdef __cpp_exceptions
       throw Error(err);
@@ -980,64 +980,62 @@ inline Expected<Model> model_create(const PmxModel& pmx_model,
   return Model::create(pmx_model, config);
 }
 
-inline Status convert_pmx_file(const char* pmx_path, const char* glb_path,
-                               const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_pmx_file(pmx_path, glb_path, config);
+inline Status convert_file(const char* input_path, const char* glb_path,
+                           const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_file(input_path, glb_path, config);
 }
 
-inline Status convert_pmx_filen(const char* pmx_path, size_t pmx_path_len, const char* glb_path,
-                                size_t glb_path_len,
-                                const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_pmx_filen(pmx_path, pmx_path_len, glb_path, glb_path_len, config);
+inline Status convert_filen(const char* input_path, size_t input_path_len, const char* glb_path,
+                            size_t glb_path_len, const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_filen(input_path, input_path_len, glb_path, glb_path_len, config);
 }
 
-inline Status convert_pmx_to_gltf_file(const char* pmx_path, const char* gltf_path,
-                                       const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_pmx_to_gltf_file(pmx_path, gltf_path, config);
+inline Status convert_to_gltf_file(const char* input_path, const char* gltf_path,
+                                   const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_to_gltf_file(input_path, gltf_path, config);
 }
 
-inline Status convert_pmx_to_gltf_filen(const char* pmx_path, size_t pmx_path_len,
-                                        const char* gltf_path, size_t gltf_path_len,
-                                        const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_pmx_to_gltf_filen(pmx_path, pmx_path_len, gltf_path, gltf_path_len,
-                                           config);
+inline Status convert_to_gltf_filen(const char* input_path, size_t input_path_len,
+                                    const char* gltf_path, size_t gltf_path_len,
+                                    const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_to_gltf_filen(input_path, input_path_len, gltf_path, gltf_path_len,
+                                       config);
 }
 
 inline Expected<std::vector<uint8_t>>
-convert_pmx_memory(const uint8_t* pmx_data, size_t pmx_size,
-                   const ExportConfig* config = nullptr) noexcept {
-  uint8_t* data = nullptr;
-  size_t size = 0;
-  if (auto err = mmdgltf_convert_pmx_memory(pmx_data, pmx_size, &data, &size, config);
+convert_memory(const uint8_t* data, size_t size, const ExportConfig* config = nullptr) noexcept {
+  uint8_t* out_data = nullptr;
+  size_t out_size = 0;
+  if (auto err = mmdgltf_convert_memory(data, size, &out_data, &out_size, config);
       err != MMDGLTF_OK) {
     return {unexpect, err};
   }
-  std::vector<uint8_t> result(data, data + size);
-  mmdgltf_export_free(data, size);
+  std::vector<uint8_t> result(out_data, out_data + out_size);
+  mmdgltf_export_free(out_data, out_size);
   return {in_place, std::move(result)};
 }
 
-inline Expected<PmxModel> pmx_load_file(const char* path) noexcept {
+inline Expected<PmxModel> load_file(const char* path) noexcept {
   return PmxModel::load_file(path);
 }
 
-inline Expected<PmxModel> pmx_load_file(const char* path, size_t path_len) noexcept {
+inline Expected<PmxModel> load_file(const char* path, size_t path_len) noexcept {
   return PmxModel::load_file(path, path_len);
 }
 
-inline Expected<PmxModel> pmx_load_filen(const char* path, size_t path_len) noexcept {
+inline Expected<PmxModel> load_filen(const char* path, size_t path_len) noexcept {
   return PmxModel::load_filen(path, path_len);
 }
 
-inline Expected<PmxModel> pmx_load_memory(const void* data, size_t size) noexcept {
+inline Expected<PmxModel> load_memory(const void* data, size_t size) noexcept {
   return PmxModel::load_memory(data, size);
 }
 
-inline Expected<PmxModel> pmx_load_stream(const mmdgltf_StreamFunc* func, void* src) noexcept {
+inline Expected<PmxModel> load_stream(const mmdgltf_StreamFunc* func, void* src) noexcept {
   return PmxModel::load_stream(func, src);
 }
 
-inline Expected<PmxModel> pmx_load_stream(const mmdgltf_StreamFunc& func, void* src) noexcept {
+inline Expected<PmxModel> load_stream(const mmdgltf_StreamFunc& func, void* src) noexcept {
   return PmxModel::load_stream(func, src);
 }
 

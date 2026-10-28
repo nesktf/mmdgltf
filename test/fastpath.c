@@ -31,8 +31,7 @@ static MunitResult test_fastpath_memory(const MunitParameter* params, void* data
 
   u8* glb_data = NULL;
   size_t glb_size = 0;
-  mmdgltf_Status st =
-    mmdgltf_convert_pmx_memory(pmx_data, (size_t)fsz, &glb_data, &glb_size, NULL);
+  mmdgltf_Status st = mmdgltf_convert_memory(pmx_data, (size_t)fsz, &glb_data, &glb_size, NULL);
   free(pmx_data);
 
   munit_assert_int(st, ==, MMDGLTF_OK);
@@ -82,7 +81,7 @@ static MunitResult test_fastpath_file(const MunitParameter* params, void* data) 
   UNUSED(data);
 
   const char* out_file = "/tmp/test_nitori_fastpath.glb";
-  mmdgltf_Status st = mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
+  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   tg3_model parsed;
@@ -111,7 +110,7 @@ static MunitResult test_fastpath_gltf_file(const MunitParameter* params, void* d
   UNUSED(data);
 
   const char* out_file = "/tmp/test_nitori_fastpath.gltf";
-  mmdgltf_Status st = mmdgltf_convert_pmx_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
+  mmdgltf_Status st = mmdgltf_convert_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   FILE* fbin = fopen("/tmp/test_nitori_fastpath.bin", "rb");
@@ -154,10 +153,10 @@ static MunitResult test_fastpath_bone_names(const MunitParameter* params, void* 
   const char* out_jp = "/tmp/test_nitori_jp.glb";
   const char* out_en = "/tmp/test_nitori_en.glb";
 
-  mmdgltf_Status st_jp = mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_jp, &cfg_jp);
+  mmdgltf_Status st_jp = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_jp, &cfg_jp);
   munit_assert_int(st_jp, ==, MMDGLTF_OK);
 
-  mmdgltf_Status st_en = mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_en, &cfg_en);
+  mmdgltf_Status st_en = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_en, &cfg_en);
   munit_assert_int(st_en, ==, MMDGLTF_OK);
 
   tg3_model parsed_jp, parsed_en;
@@ -205,7 +204,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
   UNUSED(data);
 
   const double t0_std = get_time_sec();
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -243,7 +242,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
   fclose(f);
 
   mmdgltf_Status st_fast =
-    mmdgltf_convert_pmx_memory(pmx_bytes, (size_t)fsz, &fast_glb_data, &fast_glb_size, NULL);
+    mmdgltf_convert_memory(pmx_bytes, (size_t)fsz, &fast_glb_data, &fast_glb_size, NULL);
   free(pmx_bytes);
   munit_assert_int(st_fast, ==, MMDGLTF_OK);
   const double t1_fast = get_time_sec();
@@ -403,7 +402,7 @@ static MunitResult test_fastpath_pmd_parity_and_benchmark(const MunitParameter* 
   UNUSED(data);
 
   const double t0 = get_time_sec();
-  mmdgltf_Pmx pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_MIKU_PMD);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_MIKU_PMD);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
   munit_assert_int(MMDGLTF_CHECK(model), ==, MMDGLTF_OK);
@@ -478,26 +477,19 @@ static MunitResult test_fastpath_errors(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  munit_assert_int(mmdgltf_convert_pmx_file(NULL, "/tmp/out.glb", NULL), ==,
-                   MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, NULL, NULL), ==,
-                   MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_convert_file(NULL, "/tmp/out.glb", NULL), ==,
+                   MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_convert_file(MMDGLTF_TEST_MIKU_PMD, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   u8* out_data = NULL;
   size_t out_size = 0;
-  munit_assert_int(mmdgltf_convert_pmx_memory(NULL, 100, &out_data, &out_size, NULL), ==,
-                   MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_convert_memory(NULL, 100, &out_data, &out_size, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   u8 bad_buf[64] = {0};
-  munit_assert_int(
-    mmdgltf_convert_pmx_memory(bad_buf, sizeof(bad_buf), &out_data, &out_size, NULL), ==,
-    MMDGLTF_ERROR_INVALID_SIGNATURE);
   munit_assert_int(mmdgltf_convert_memory(bad_buf, sizeof(bad_buf), &out_data, &out_size, NULL),
                    ==, MMDGLTF_ERROR_INVALID_SIGNATURE);
 

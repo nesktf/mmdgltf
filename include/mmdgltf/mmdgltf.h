@@ -442,16 +442,11 @@ MMDGLTF_API mmdgltf_Status mmdgltf_model_joints(mmdgltf_Model model,
                                                 const mmdgltf_PmxJoint** out_joints,
                                                 size_t* out_count);
 
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_file(const char* path);
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_filen(const char* path, size_t path_len);
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size);
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_stream(const mmdgltf_StreamFunc* func, void* src);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_file(const char* path);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_filen(const char* path, size_t path_len);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_memory(const void* data, size_t size);
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_stream(const mmdgltf_StreamFunc* func, void* src);
 MMDGLTF_API void mmdgltf_pmx_destroy(mmdgltf_Pmx pmx);
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_file(const char* path);
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_filen(const char* path, size_t path_len);
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_memory(const void* data, size_t size);
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_stream(const mmdgltf_StreamFunc* func, void* src);
 
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_get_header(mmdgltf_Pmx pmx, mmdgltf_PmxHeader* out_header);
 MMDGLTF_API mmdgltf_Status mmdgltf_pmx_get_model_info(mmdgltf_Pmx pmx,
@@ -494,40 +489,6 @@ MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_memory(mmdgltf_Model model, uint8_
                                                      size_t* out_size,
                                                      const mmdgltf_ExportConfig* config);
 MMDGLTF_API void mmdgltf_export_free(uint8_t* data, size_t size);
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_file(const char* pmx_path, const char* glb_path,
-                                                    const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_filen(const char* pmx_path, size_t pmx_path_len,
-                                                     const char* glb_path, size_t glb_path_len,
-                                                     const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_to_gltf_file(const char* pmx_path,
-                                                            const char* gltf_path,
-                                                            const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_to_gltf_filen(const char* pmx_path,
-                                                             size_t pmx_path_len,
-                                                             const char* gltf_path,
-                                                             size_t gltf_path_len,
-                                                             const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_memory(const uint8_t* pmx_data, size_t pmx_size,
-                                                      uint8_t** out_glb_data, size_t* out_glb_size,
-                                                      const mmdgltf_ExportConfig* config);
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmd_file(const char* pmd_path, const char* glb_path,
-                                                    const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmd_filen(const char* pmd_path, size_t pmd_path_len,
-                                                     const char* glb_path, size_t glb_path_len,
-                                                     const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmd_to_gltf_file(const char* pmd_path,
-                                                            const char* gltf_path,
-                                                            const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmd_to_gltf_filen(const char* pmd_path,
-                                                             size_t pmd_path_len,
-                                                             const char* gltf_path,
-                                                             size_t gltf_path_len,
-                                                             const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmd_memory(const uint8_t* pmd_data, size_t pmd_size,
-                                                      uint8_t** out_glb_data, size_t* out_glb_size,
-                                                      const mmdgltf_ExportConfig* config);
 
 MMDGLTF_API mmdgltf_Status mmdgltf_convert_file(const char* input_path, const char* glb_path,
                                                 const mmdgltf_ExportConfig* config);

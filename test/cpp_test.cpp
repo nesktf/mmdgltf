@@ -292,7 +292,7 @@ static void test_gpu_model_runtime() {
 
 static void test_fastpath_cpp() {
   const char* out_file = "/tmp/test_cpp_fastpath.glb";
-  auto status = mmdgltf::convert_pmx_file(MMDGLTF_TEST_NITORI_PMX, out_file);
+  auto status = mmdgltf::convert_file(MMDGLTF_TEST_NITORI_PMX, out_file);
   assert(status == MMDGLTF_OK);
 
   FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
@@ -305,17 +305,98 @@ static void test_fastpath_cpp() {
   assert(rd == static_cast<size_t>(fsz));
   fclose(f);
 
-  auto glb_res = mmdgltf::convert_pmx_memory(pmx_bytes.data(), pmx_bytes.size());
+  auto glb_res = mmdgltf::convert_memory(pmx_bytes.data(), pmx_bytes.size());
   assert(glb_res.has_value());
   assert(glb_res->size() > 20);
   assert((*glb_res)[0] == 'g' && (*glb_res)[1] == 'l' && (*glb_res)[2] == 'T' &&
          (*glb_res)[3] == 'F');
 
   const char* out_gltf = "/tmp/test_cpp_fastpath.gltf";
-  auto status_gltf = mmdgltf::convert_pmx_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_gltf);
+  auto status_gltf = mmdgltf::convert_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_gltf);
   assert(status_gltf == MMDGLTF_OK);
   remove("/tmp/test_cpp_fastpath.gltf");
   remove("/tmp/test_cpp_fastpath.bin");
+}
+
+static void test_pmd_model_loading_and_conversion() {
+  auto exp_pmd = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_MIKU_PMD);
+  assert(exp_pmd.has_value());
+  assert(!exp_pmd->empty());
+
+  auto hdr = exp_pmd->header();
+  assert(hdr.has_value());
+  assert(hdr->version == 2.0f);
+
+  auto info = exp_pmd->model_info();
+  assert(info.has_value());
+  assert(std::string(info->name_jp).find("初音ミク") != std::string::npos);
+
+  auto verts = exp_pmd->vertices();
+  assert(verts.has_value());
+  assert(verts->size() > 0);
+
+  auto indices = exp_pmd->indices();
+  assert(indices.has_value());
+  assert(indices->size() > 0);
+
+  auto materials = exp_pmd->materials();
+  assert(materials.has_value());
+  assert(materials->size() == 17);
+
+  auto bones = exp_pmd->bones();
+  assert(bones.has_value());
+  assert(bones->size() == 122);
+
+  auto morphs = exp_pmd->morphs();
+  assert(morphs.has_value());
+  assert(morphs->size() > 0);
+
+  auto rbs = exp_pmd->rigid_bodies();
+  assert(rbs.has_value());
+  assert(rbs->size() > 0);
+
+  auto joints = exp_pmd->joints();
+  assert(joints.has_value());
+  assert(joints->size() > 0);
+
+  mmdgltf_ModelConfig cfg;
+  mmdgltf_model_config_default(&cfg);
+  auto exp_model = mmdgltf::model_create(*exp_pmd, &cfg);
+  assert(exp_model.has_value());
+  assert(!exp_model->empty());
+
+  auto glb_res = exp_model->export_glb_memory();
+  assert(glb_res.has_value());
+  assert(glb_res->size() > 20);
+  assert((*glb_res)[0] == 'g' && (*glb_res)[1] == 'l' && (*glb_res)[2] == 'T' &&
+         (*glb_res)[3] == 'F');
+
+  mmdgltf::PmxModel pmx = std::move(*exp_pmd);
+  assert(!pmx.empty());
+  assert(exp_pmd->empty());
+
+  auto pmx_materials = pmx.materials();
+  assert(pmx_materials.has_value());
+  assert(pmx_materials->size() == 17);
+
+  const char* out_generic_glb = "/tmp/test_cpp_generic.glb";
+  auto status = mmdgltf::convert_file(MMDGLTF_TEST_MIKU_PMD, out_generic_glb);
+  assert(status == MMDGLTF_OK);
+  remove(out_generic_glb);
+
+  FILE* f = fopen(MMDGLTF_TEST_MIKU_PMD, "rb");
+  assert(f != nullptr);
+  fseek(f, 0, SEEK_END);
+  long fsz = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  std::vector<uint8_t> pmd_bytes(fsz);
+  size_t rd = fread(pmd_bytes.data(), 1, fsz, f);
+  assert(rd == static_cast<size_t>(fsz));
+  fclose(f);
+
+  auto fast_generic_glb = mmdgltf::convert_memory(pmd_bytes.data(), pmd_bytes.size());
+  assert(fast_generic_glb.has_value());
+  assert(fast_generic_glb->size() > 20);
 }
 
 int main() {
@@ -324,6 +405,7 @@ int main() {
   test_pmx_model_loading_and_getters();
   test_gpu_model_runtime();
   test_fastpath_cpp();
+  test_pmd_model_loading_and_conversion();
   printf("All mmdgltf C++ tests passed!\n");
   return 0;
 }

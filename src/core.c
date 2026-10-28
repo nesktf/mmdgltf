@@ -1,5 +1,6 @@
 #include "mmdgltf_internal.h"
 
+#include <stdio.h>
 #include <string.h>
 
 size_t mmdgltf__bytevec_append(mmdgltf__ByteVec* bv, const void* src, size_t sz) {
@@ -231,4 +232,96 @@ MMDGLTF_API void mmdgltf_set_alloc(const mmdgltf_Alloc* alloc) {
     return;
   }
   mmdgltf__alloc = *alloc;
+}
+
+static_assert(MMDGLTF_SEEK_CUR == SEEK_CUR, "SEEK_CUR mismatch");
+static_assert(MMDGLTF_SEEK_END == SEEK_END, "SEEK_END mismatch");
+static_assert(MMDGLTF_SEEK_SET == SEEK_SET, "SEEK_SET mismatch");
+const mmdgltf_StreamFunc mmdgltf__file_io = {
+  .read = (PFN_mmdgltf_read_func)fread,
+  .seek = (PFN_mmdgltf_seek_func)fseek,
+  .tell = (PFN_mmdgltf_tell_func)ftell,
+  .eof = (PFN_mmdgltf_eof_func)feof,
+};
+
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_stream(const mmdgltf_StreamFunc* func, void* src) {
+  if (!func || !src || !func->read || !func->seek) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
+  }
+
+  u8 magic[4] = {0};
+  const size_t rd = func->read(magic, 1, 4, src);
+  if (rd < 3) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_SIGNATURE);
+  }
+
+  if (func->seek(src, 0, MMDGLTF_SEEK_SET) != 0) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_IO);
+  }
+
+  if (memcmp(magic, "Pmd", 3) == 0) {
+    return mmdgltf__pmd_load_stream(func, src);
+  } else if (rd >= 4 && memcmp(magic, "PMX ", 4) == 0) {
+    return mmdgltf__pmx_load_stream(func, src);
+  }
+
+  return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_SIGNATURE);
+}
+
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_memory(const void* data, size_t size) {
+  if (!data || size == 0) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
+  }
+  if (size < 4) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_SIGNATURE);
+  }
+  mmdgltf__MemStream mem = {
+    .data = (const u8*)data,
+    .size = size,
+    .pos = 0,
+  };
+  return mmdgltf_load_stream(&mmdgltf__mem_io, &mem);
+}
+
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_filen(const char* path, size_t path_len) {
+  if (!path || path_len == 0) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
+  }
+
+  char* null_path = MMDGLTF_MALLOC(path_len + 1);
+  if (!null_path) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_OUT_OF_MEMORY);
+  }
+  memcpy(null_path, path, path_len);
+  null_path[path_len] = '\0';
+
+  FILE* f = fopen(null_path, "rb");
+  MMDGLTF_FREE(null_path, path_len + 1);
+  if (!f) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_IO);
+  }
+
+  mmdgltf_Pmx pmx = mmdgltf_load_stream(&mmdgltf__file_io, f);
+  fclose(f);
+  if (MMDGLTF_CHECK(pmx) == MMDGLTF_OK && pmx) {
+    size_t last_slash = (size_t)-1;
+    for (size_t i = 0; i < path_len; ++i) {
+      if (path[i] == '/' || path[i] == '\\') {
+        last_slash = i;
+      }
+    }
+    if (last_slash != (size_t)-1) {
+      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, path, last_slash);
+    } else {
+      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, ".", 1);
+    }
+  }
+  return pmx;
+}
+
+MMDGLTF_API mmdgltf_Pmx mmdgltf_load_file(const char* path) {
+  if (!path) {
+    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
+  }
+  return mmdgltf_load_filen(path, strlen(path));
 }

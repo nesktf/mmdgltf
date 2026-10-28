@@ -151,6 +151,9 @@ int mmdgltf__mem_eof(mmdgltf__MemStream* m);
 extern const mmdgltf_StreamFunc mmdgltf__mem_io;
 extern const mmdgltf_StreamFunc mmdgltf__file_io;
 
+mmdgltf_Pmx mmdgltf__pmx_load_stream(const mmdgltf_StreamFunc* func, void* src);
+mmdgltf_Pmx mmdgltf__pmd_load_stream(const mmdgltf_StreamFunc* func, void* src);
+
 struct mmdgltf_Pmx_T {
   mmdgltf_Arena* arena;
   const char* base_dir;

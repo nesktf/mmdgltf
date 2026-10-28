@@ -45,7 +45,7 @@ typedef struct PmdRawMorph {
   PmdRawMorphItem* data;
 } PmdRawMorph;
 
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_stream(const mmdgltf_StreamFunc* func, void* src) {
+mmdgltf_Pmx mmdgltf__pmd_load_stream(const mmdgltf_StreamFunc* func, void* src) {
   mmdgltf_Status err;
   mmdgltf_Arena* arena = NULL;
 
@@ -627,59 +627,4 @@ on_load_error:
   }
   return MMDGLTF_ENCODE_ERROR(err);
 #undef RET_ERR
-}
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_memory(const void* data, size_t size) {
-  if (!data || size == 0) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
-  }
-  mmdgltf__MemStream mem = {
-    .data = (const u8*)data,
-    .size = size,
-    .pos = 0,
-  };
-  return mmdgltf_pmd_load_stream(&mmdgltf__mem_io, &mem);
-}
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_filen(const char* path, size_t path_len) {
-  if (!path || path_len == 0) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
-  }
-
-  char* null_path = MMDGLTF_MALLOC(path_len + 1);
-  if (!null_path) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_OUT_OF_MEMORY);
-  }
-  memcpy(null_path, path, path_len);
-  null_path[path_len] = '\0';
-
-  FILE* f = fopen(null_path, "rb");
-  MMDGLTF_FREE(null_path, path_len + 1);
-  if (!f) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_IO);
-  }
-
-  mmdgltf_Pmx pmx = mmdgltf_pmd_load_stream(&mmdgltf__file_io, f);
-  fclose(f);
-  if (MMDGLTF_CHECK(pmx) == MMDGLTF_OK && pmx) {
-    size_t last_slash = (size_t)-1;
-    for (size_t i = 0; i < path_len; ++i) {
-      if (path[i] == '/' || path[i] == '\\') {
-        last_slash = i;
-      }
-    }
-    if (last_slash != (size_t)-1) {
-      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, path, last_slash);
-    } else {
-      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, ".", 1);
-    }
-  }
-  return pmx;
-}
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_file(const char* path) {
-  if (!path) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
-  }
-  return mmdgltf_pmd_load_filen(path, strlen(path));
 }

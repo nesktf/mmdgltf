@@ -5,7 +5,7 @@ static MunitResult test_model_create_default(const MunitParameter* params, void*
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
@@ -99,7 +99,7 @@ static MunitResult test_model_coordinate_transforms(const MunitParameter* params
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg_rh;
@@ -170,7 +170,7 @@ static MunitResult test_model_selective_loading(const MunitParameter* params, vo
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg;
@@ -227,7 +227,7 @@ static MunitResult test_model_textures_format_transcode(const MunitParameter* pa
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg;
@@ -290,7 +290,7 @@ static MunitResult test_model_textures_missing_strict_vs_lenient(const MunitPara
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg_lenient;
@@ -351,7 +351,7 @@ static MunitResult test_model_create_pmd(const MunitParameter* params, void* dat
   UNUSED(params);
   UNUSED(data);
 
-  const mmdgltf_Pmx pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_MIKU_PMD);
+  const mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_MIKU_PMD);
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 

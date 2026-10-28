@@ -10,7 +10,7 @@ static MunitResult test_export_glb_memory_default(const MunitParameter* params, 
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -64,7 +64,7 @@ static MunitResult test_export_glb_file_unlit(const MunitParameter* params, void
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -107,7 +107,7 @@ static MunitResult test_export_gltf_file(const MunitParameter* params, void* dat
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -155,7 +155,7 @@ static MunitResult test_export_errors(const MunitParameter* params, void* data) 
   munit_assert_int(mmdgltf_export_glb_memory(NULL, NULL, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
   mmdgltf_pmx_destroy(pmx);
 
@@ -173,7 +173,7 @@ static MunitResult test_export_glb_pmd(const MunitParameter* params, void* data)
   UNUSED(params);
   UNUSED(data);
 
-  const mmdgltf_Pmx pmx = mmdgltf_pmd_load_file(MMDGLTF_TEST_MIKU_PMD);
+  const mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_MIKU_PMD);
   munit_assert_ptr_not_null(pmx);
 
   const mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
