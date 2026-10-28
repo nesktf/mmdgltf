@@ -944,21 +944,26 @@ public:
     return {in_place, ptr, count};
   }
 
-  mmdgltf_Status export_glb_file(const char* filename,
-                                 const ExportConfig* config = nullptr) const noexcept {
-    return mmdgltf_export_glb_file(_model, filename, config);
+  mmdgltf_Status export_file(const char* filename,
+                             const ExportConfig* config = nullptr) const noexcept {
+    return mmdgltf_export_file(_model, filename, config);
   }
 
-  mmdgltf_Status export_gltf_file(const char* filename,
-                                  const ExportConfig* config = nullptr) const noexcept {
-    return mmdgltf_export_gltf_file(_model, filename, config);
+  mmdgltf_Status export_file(const char* filename, size_t filename_len,
+                             const ExportConfig* config = nullptr) const noexcept {
+    return mmdgltf_export_filen(_model, filename, filename_len, config);
+  }
+
+  mmdgltf_Status export_filen(const char* filename, size_t filename_len,
+                              const ExportConfig* config = nullptr) const noexcept {
+    return mmdgltf_export_filen(_model, filename, filename_len, config);
   }
 
   Expected<std::vector<uint8_t>>
-  export_glb_memory(const ExportConfig* config = nullptr) const noexcept {
+  export_memory(const ExportConfig* config = nullptr) const noexcept {
     uint8_t* data = nullptr;
     size_t size = 0;
-    if (auto err = mmdgltf_export_glb_memory(_model, &data, &size, config); err != MMDGLTF_OK) {
+    if (auto err = mmdgltf_export_memory(_model, &data, &size, config); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
     std::vector<uint8_t> result(data, data + size);
@@ -980,26 +985,15 @@ inline Expected<Model> model_create(const PmxModel& pmx_model,
   return Model::create(pmx_model, config);
 }
 
-inline Status convert_file(const char* input_path, const char* glb_path,
+inline Status convert_file(const char* input_path, const char* output_path,
                            const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_file(input_path, glb_path, config);
+  return mmdgltf_convert_file(input_path, output_path, config);
 }
 
-inline Status convert_filen(const char* input_path, size_t input_path_len, const char* glb_path,
-                            size_t glb_path_len, const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_filen(input_path, input_path_len, glb_path, glb_path_len, config);
-}
-
-inline Status convert_to_gltf_file(const char* input_path, const char* gltf_path,
-                                   const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_to_gltf_file(input_path, gltf_path, config);
-}
-
-inline Status convert_to_gltf_filen(const char* input_path, size_t input_path_len,
-                                    const char* gltf_path, size_t gltf_path_len,
-                                    const ExportConfig* config = nullptr) noexcept {
-  return mmdgltf_convert_to_gltf_filen(input_path, input_path_len, gltf_path, gltf_path_len,
-                                       config);
+inline Status convert_filen(const char* input_path, size_t input_path_len, const char* output_path,
+                            size_t output_path_len,
+                            const ExportConfig* config = nullptr) noexcept {
+  return mmdgltf_convert_filen(input_path, input_path_len, output_path, output_path_len, config);
 }
 
 inline Expected<std::vector<uint8_t>>

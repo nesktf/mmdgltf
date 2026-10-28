@@ -283,7 +283,7 @@ static void test_gpu_model_runtime() {
   assert(!moved_model.empty());
   assert(exp_model->empty());
 
-  auto exp_glb = moved_model.export_glb_memory();
+  auto exp_glb = moved_model.export_memory();
   assert(exp_glb.has_value());
   assert(exp_glb->size() > 20);
   assert((*exp_glb)[0] == 'g' && (*exp_glb)[1] == 'l' && (*exp_glb)[2] == 'T' &&
@@ -312,7 +312,10 @@ static void test_fastpath_cpp() {
          (*glb_res)[3] == 'F');
 
   const char* out_gltf = "/tmp/test_cpp_fastpath.gltf";
-  auto status_gltf = mmdgltf::convert_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_gltf);
+  mmdgltf::ExportConfig cfg;
+  mmdgltf_export_config_default(&cfg);
+  cfg.format = MMDGLTF_FORMAT_GLTF;
+  auto status_gltf = mmdgltf::convert_file(MMDGLTF_TEST_NITORI_PMX, out_gltf, &cfg);
   assert(status_gltf == MMDGLTF_OK);
   remove("/tmp/test_cpp_fastpath.gltf");
   remove("/tmp/test_cpp_fastpath.bin");
@@ -365,7 +368,7 @@ static void test_pmd_model_loading_and_conversion() {
   assert(exp_model.has_value());
   assert(!exp_model->empty());
 
-  auto glb_res = exp_model->export_glb_memory();
+  auto glb_res = exp_model->export_memory();
   assert(glb_res.has_value());
   assert(glb_res->size() > 20);
   assert((*glb_res)[0] == 'g' && (*glb_res)[1] == 'l' && (*glb_res)[2] == 'T' &&

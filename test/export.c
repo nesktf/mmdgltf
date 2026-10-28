@@ -20,7 +20,7 @@ static MunitResult test_export_glb_memory_default(const MunitParameter* params, 
 
   u8* glb_data = NULL;
   size_t glb_size = 0;
-  mmdgltf_Status st = mmdgltf_export_glb_memory(model, &glb_data, &glb_size, NULL);
+  mmdgltf_Status st = mmdgltf_export_memory(model, &glb_data, &glb_size, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
   munit_assert_ptr_not_null(glb_data);
   munit_assert_size(glb_size, >, 20);
@@ -76,7 +76,7 @@ static MunitResult test_export_glb_file_unlit(const MunitParameter* params, void
   cfg.unlit = 1;
 
   const char* out_file = "/tmp/test_nitori_export.glb";
-  mmdgltf_Status st = mmdgltf_export_glb_file(model, out_file, &cfg);
+  mmdgltf_Status st = mmdgltf_export_file(model, out_file, &cfg);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   tg3_model parsed;
@@ -115,7 +115,10 @@ static MunitResult test_export_gltf_file(const MunitParameter* params, void* dat
   munit_assert_ptr_not_null(model);
 
   const char* out_file = "/tmp/test_nitori_export.gltf";
-  mmdgltf_Status st = mmdgltf_export_gltf_file(model, out_file, NULL);
+  mmdgltf_ExportConfig cfg;
+  mmdgltf_export_config_default(&cfg);
+  cfg.format = MMDGLTF_FORMAT_GLTF;
+  mmdgltf_Status st = mmdgltf_export_file(model, out_file, &cfg);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   FILE* fbin = fopen("/tmp/test_nitori_export.bin", "rb");
@@ -148,21 +151,19 @@ static MunitResult test_export_errors(const MunitParameter* params, void* data) 
   UNUSED(params);
   UNUSED(data);
 
-  munit_assert_int(mmdgltf_export_glb_file(NULL, "out.glb", NULL), ==,
+  munit_assert_int(mmdgltf_export_file(NULL, "out.glb", NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_export_filen(NULL, "out.glb", 7, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_export_glb_filen(NULL, "out.glb", 7, NULL), ==,
-                   MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_export_glb_memory(NULL, NULL, NULL, NULL), ==,
+  munit_assert_int(mmdgltf_export_memory(NULL, NULL, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
   mmdgltf_pmx_destroy(pmx);
 
-  munit_assert_int(mmdgltf_export_glb_file(model, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_export_glb_filen(model, NULL, 0, NULL), ==,
-                   MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_export_glb_memory(model, NULL, NULL, NULL), ==,
+  munit_assert_int(mmdgltf_export_file(model, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_export_filen(model, NULL, 0, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_export_memory(model, NULL, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
 
   mmdgltf_model_destroy(model);
@@ -183,7 +184,7 @@ static MunitResult test_export_glb_pmd(const MunitParameter* params, void* data)
 
   u8* glb_data = NULL;
   size_t glb_size = 0;
-  mmdgltf_Status st = mmdgltf_export_glb_memory(model, &glb_data, &glb_size, NULL);
+  mmdgltf_Status st = mmdgltf_export_memory(model, &glb_data, &glb_size, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
   munit_assert_ptr_not_null(glb_data);
   munit_assert_size(glb_size, >, 20);

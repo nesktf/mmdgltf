@@ -91,6 +91,7 @@ int main(int argc, char* argv[]) {
     }
     if (strcmp(arg, "--gltf") == 0) {
       is_gltf = true;
+      config.format = MMDGLTF_FORMAT_GLTF;
     } else if (strcmp(arg, "--unlit") == 0) {
       config.unlit = 1;
     } else if (strcmp(arg, "--verbose") == 0) {
@@ -180,12 +181,7 @@ int main(int argc, char* argv[]) {
   }
 
   const double t0 = get_time_sec();
-  mmdgltf_Status st;
-  if (is_gltf) {
-    st = mmdgltf_convert_to_gltf_file(input_file, output_file, &config);
-  } else {
-    st = mmdgltf_convert_file(input_file, output_file, &config);
-  }
+  const mmdgltf_Status st = mmdgltf_convert_file(input_file, output_file, &config);
   const double t1 = get_time_sec();
 
   if (st != MMDGLTF_OK) {

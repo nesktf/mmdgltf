@@ -1972,40 +1972,25 @@ static mmdgltf_Status convert_memory_internal(const uint8_t* data, size_t size,
   stream.src = &mem;
   stream.status = MMDGLTF_OK;
 
-  return convert_stream(&stream, NULL, config, NULL, 0, out_glb_data, out_glb_size, true);
+  const bool write_binary = (config == NULL || config->format == MMDGLTF_FORMAT_GLB);
+  return convert_stream(&stream, NULL, config, NULL, 0, out_glb_data, out_glb_size, write_binary);
 }
 
 MMDGLTF_API mmdgltf_Status mmdgltf_convert_filen(const char* input_path, size_t input_path_len,
-                                                 const char* glb_path, size_t glb_path_len,
+                                                 const char* output_path, size_t output_path_len,
                                                  const mmdgltf_ExportConfig* config) {
-  return convert_file_internal(input_path, input_path_len, glb_path, glb_path_len, config, true);
+  const bool write_binary = (config == NULL || config->format == MMDGLTF_FORMAT_GLB);
+  return convert_file_internal(input_path, input_path_len, output_path, output_path_len, config,
+                               write_binary);
 }
 
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_file(const char* input_path, const char* glb_path,
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_file(const char* input_path, const char* output_path,
                                                 const mmdgltf_ExportConfig* config) {
-  if (!input_path || !glb_path) {
+  if (!input_path || !output_path) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
-  return mmdgltf_convert_filen(input_path, strlen(input_path), glb_path, strlen(glb_path), config);
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_to_gltf_filen(const char* input_path,
-                                                         size_t input_path_len,
-                                                         const char* gltf_path,
-                                                         size_t gltf_path_len,
-                                                         const mmdgltf_ExportConfig* config) {
-  return convert_file_internal(input_path, input_path_len, gltf_path, gltf_path_len, config,
-                               false);
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_to_gltf_file(const char* input_path,
-                                                        const char* gltf_path,
-                                                        const mmdgltf_ExportConfig* config) {
-  if (!input_path || !gltf_path) {
-    return MMDGLTF_ERROR_INVALID_ARGUMENT;
-  }
-  return mmdgltf_convert_to_gltf_filen(input_path, strlen(input_path), gltf_path,
-                                       strlen(gltf_path), config);
+  return mmdgltf_convert_filen(input_path, strlen(input_path), output_path, strlen(output_path),
+                               config);
 }
 
 MMDGLTF_API mmdgltf_Status mmdgltf_convert_memory(const uint8_t* data, size_t size,

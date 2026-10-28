@@ -110,7 +110,10 @@ static MunitResult test_fastpath_gltf_file(const MunitParameter* params, void* d
   UNUSED(data);
 
   const char* out_file = "/tmp/test_nitori_fastpath.gltf";
-  mmdgltf_Status st = mmdgltf_convert_to_gltf_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
+  mmdgltf_ExportConfig cfg;
+  mmdgltf_export_config_default(&cfg);
+  cfg.format = MMDGLTF_FORMAT_GLTF;
+  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_file, &cfg);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   FILE* fbin = fopen("/tmp/test_nitori_fastpath.bin", "rb");
@@ -213,7 +216,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
 
   u8* std_glb_data = NULL;
   size_t std_glb_size = 0;
-  mmdgltf_Status st_std = mmdgltf_export_glb_memory(model, &std_glb_data, &std_glb_size, NULL);
+  mmdgltf_Status st_std = mmdgltf_export_memory(model, &std_glb_data, &std_glb_size, NULL);
   munit_assert_int(st_std, ==, MMDGLTF_OK);
   const double t1_std = get_time_sec();
   const double std_elapsed = t1_std - t0_std;
@@ -373,7 +376,10 @@ static MunitResult test_fastpath_pmd_gltf_file(const MunitParameter* params, voi
   UNUSED(data);
 
   const char* out_file = "/tmp/test_miku_fastpath.gltf";
-  mmdgltf_Status st = mmdgltf_convert_to_gltf_file(MMDGLTF_TEST_MIKU_PMD, out_file, NULL);
+  mmdgltf_ExportConfig cfg;
+  mmdgltf_export_config_default(&cfg);
+  cfg.format = MMDGLTF_FORMAT_GLTF;
+  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_MIKU_PMD, out_file, &cfg);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   tg3_model parsed;
@@ -410,7 +416,7 @@ static MunitResult test_fastpath_pmd_parity_and_benchmark(const MunitParameter* 
 
   u8* std_glb_data = NULL;
   size_t std_glb_size = 0;
-  mmdgltf_Status st = mmdgltf_export_glb_memory(model, &std_glb_data, &std_glb_size, NULL);
+  mmdgltf_Status st = mmdgltf_export_memory(model, &std_glb_data, &std_glb_size, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
   const double std_elapsed = get_time_sec() - t0;
 

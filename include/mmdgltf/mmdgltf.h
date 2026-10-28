@@ -405,7 +405,13 @@ typedef struct mmdgltf_VertexBuffers {
 
 typedef struct mmdgltf_Model_T* mmdgltf_Model;
 
+typedef enum mmdgltf_FileFormat {
+  MMDGLTF_FORMAT_GLB = 0,
+  MMDGLTF_FORMAT_GLTF = 1,
+} mmdgltf_FileFormat;
+
 typedef struct mmdgltf_ExportConfig {
+  uint8_t format;
   uint8_t unlit;
   uint8_t export_skinning;
   uint8_t export_morphs;
@@ -475,36 +481,23 @@ MMDGLTF_API mmdgltf_Status mmdgltf_pmx_joints(mmdgltf_Pmx pmx, const mmdgltf_Pmx
                                               size_t* out_count);
 
 MMDGLTF_API void mmdgltf_export_config_default(mmdgltf_ExportConfig* out_config);
-MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_file(mmdgltf_Model model, const char* filename,
-                                                   const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_filen(mmdgltf_Model model, const char* filename,
-                                                    size_t filename_len,
-                                                    const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_export_gltf_file(mmdgltf_Model model, const char* filename,
-                                                    const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_export_gltf_filen(mmdgltf_Model model, const char* filename,
-                                                     size_t filename_len,
-                                                     const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_memory(mmdgltf_Model model, uint8_t** out_data,
-                                                     size_t* out_size,
-                                                     const mmdgltf_ExportConfig* config);
+MMDGLTF_API mmdgltf_Status mmdgltf_export_file(mmdgltf_Model model, const char* filename,
+                                               const mmdgltf_ExportConfig* config);
+MMDGLTF_API mmdgltf_Status mmdgltf_export_filen(mmdgltf_Model model, const char* filename,
+                                                size_t filename_len,
+                                                const mmdgltf_ExportConfig* config);
+MMDGLTF_API mmdgltf_Status mmdgltf_export_memory(mmdgltf_Model model, uint8_t** out_data,
+                                                 size_t* out_size,
+                                                 const mmdgltf_ExportConfig* config);
 MMDGLTF_API void mmdgltf_export_free(uint8_t* data, size_t size);
 
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_file(const char* input_path, const char* glb_path,
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_file(const char* input_path, const char* output_path,
                                                 const mmdgltf_ExportConfig* config);
 MMDGLTF_API mmdgltf_Status mmdgltf_convert_filen(const char* input_path, size_t input_path_len,
-                                                 const char* glb_path, size_t glb_path_len,
+                                                 const char* output_path, size_t output_path_len,
                                                  const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_to_gltf_file(const char* input_path,
-                                                        const char* gltf_path,
-                                                        const mmdgltf_ExportConfig* config);
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_to_gltf_filen(const char* input_path,
-                                                         size_t input_path_len,
-                                                         const char* gltf_path,
-                                                         size_t gltf_path_len,
-                                                         const mmdgltf_ExportConfig* config);
 MMDGLTF_API mmdgltf_Status mmdgltf_convert_memory(const uint8_t* data, size_t size,
-                                                  uint8_t** out_glb_data, size_t* out_glb_size,
+                                                  uint8_t** out_data, size_t* out_size,
                                                   const mmdgltf_ExportConfig* config);
 
 #ifdef __cplusplus
