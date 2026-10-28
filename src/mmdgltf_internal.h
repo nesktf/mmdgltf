@@ -58,6 +58,8 @@ typedef struct mmdgltf__ByteVec {
 
 size_t mmdgltf__bytevec_append(mmdgltf__ByteVec* bv, const void* src, size_t sz);
 
+bool mmdgltf__ends_with_ci(const char* str, const char* suffix);
+
 typedef struct mmdgltf_ArenaBlock {
   u8* base;
   size_t used;
@@ -76,6 +78,29 @@ mmdgltf_Arena* mmdgltf__arena_create(size_t block_size);
 void* mmdgltf__arena_alloc(mmdgltf_Arena* arena, size_t size);
 char* mmdgltf__arena_strndup(mmdgltf_Arena* arena, const char* str, size_t len);
 void mmdgltf__arena_destroy(mmdgltf_Arena* arena);
+
+typedef struct mmdgltf__TextureList {
+  mmdgltf_PmxTexture* items;
+  size_t count;
+  size_t capacity;
+} mmdgltf__TextureList;
+
+typedef mmdgltf__TextureList mmdgltf__TextureVec;
+
+i32 mmdgltf__texture_list_get_or_add(mmdgltf__TextureList* tl, mmdgltf_Arena* arena,
+                                     const char* path);
+i32 mmdgltf__texture_list_add(mmdgltf__TextureList* tl, mmdgltf_Arena* arena, const char* path);
+
+typedef struct mmdgltf__FastpathTexList {
+  char** paths;
+  size_t count;
+  size_t capacity;
+} mmdgltf__FastpathTexList;
+
+typedef mmdgltf__FastpathTexList mmdgltf__FastpathTexVec;
+
+i32 mmdgltf__fastpath_tex_list_add(mmdgltf__FastpathTexList* tl, mmdgltf_Arena* arena,
+                                   const char* path);
 
 void mmdgltf__derive_bin_paths(mmdgltf_Arena* arena, const char* gltf_path, size_t path_len,
                                char** out_bin_path, char** out_bin_uri);

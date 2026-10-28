@@ -26,6 +26,91 @@ size_t mmdgltf__bytevec_append(mmdgltf__ByteVec* bv, const void* src, size_t sz)
   return aligned_offset;
 }
 
+i32 mmdgltf__texture_list_get_or_add(mmdgltf__TextureList* tl, mmdgltf_Arena* arena,
+                                     const char* path) {
+  if (!tl || !path || path[0] == '\0') {
+    return -1;
+  }
+  for (size_t i = 0; i < tl->count; ++i) {
+    if (strcmp(tl->items[i].path, path) == 0) {
+      return (i32)i;
+    }
+  }
+  if (tl->count >= tl->capacity) {
+    const size_t new_cap = tl->capacity ? tl->capacity * 2 : 16;
+    mmdgltf_PmxTexture* new_items =
+      mmdgltf__arena_alloc(arena, new_cap * sizeof(mmdgltf_PmxTexture));
+    if (!new_items) {
+      return -1;
+    }
+    if (tl->count > 0) {
+      memcpy(new_items, tl->items, tl->count * sizeof(mmdgltf_PmxTexture));
+    }
+    tl->items = new_items;
+    tl->capacity = new_cap;
+  }
+  const size_t idx = tl->count++;
+  tl->items[idx].path = mmdgltf__arena_strndup(arena, path, strlen(path));
+  return (i32)idx;
+}
+
+i32 mmdgltf__texture_list_add(mmdgltf__TextureList* tl, mmdgltf_Arena* arena, const char* path) {
+  return mmdgltf__texture_list_get_or_add(tl, arena, path);
+}
+
+i32 mmdgltf__fastpath_tex_list_add(mmdgltf__FastpathTexList* tl, mmdgltf_Arena* arena,
+                                   const char* path) {
+  if (!tl || !path || path[0] == '\0') {
+    return -1;
+  }
+  for (size_t i = 0; i < tl->count; ++i) {
+    if (strcmp(tl->paths[i], path) == 0) {
+      return (i32)i;
+    }
+  }
+  if (tl->count >= tl->capacity) {
+    const size_t new_cap = tl->capacity ? tl->capacity * 2 : 16;
+    char** new_paths = mmdgltf__arena_alloc(arena, new_cap * sizeof(char*));
+    if (!new_paths) {
+      return -1;
+    }
+    if (tl->count > 0) {
+      memcpy(new_paths, tl->paths, tl->count * sizeof(char*));
+    }
+    tl->paths = new_paths;
+    tl->capacity = new_cap;
+  }
+  const size_t idx = tl->count++;
+  tl->paths[idx] = mmdgltf__arena_strndup(arena, path, strlen(path));
+  return (i32)idx;
+}
+
+bool mmdgltf__ends_with_ci(const char* str, const char* suffix) {
+  if (!str || !suffix) {
+    return false;
+  }
+  const size_t str_len = strlen(str);
+  const size_t suf_len = strlen(suffix);
+  if (str_len < suf_len) {
+    return false;
+  }
+  const char* p = str + (str_len - suf_len);
+  for (size_t i = 0; i < suf_len; ++i) {
+    char c1 = p[i];
+    char c2 = suffix[i];
+    if (c1 >= 'A' && c1 <= 'Z') {
+      c1 = (char)(c1 + ('a' - 'A'));
+    }
+    if (c2 >= 'A' && c2 <= 'Z') {
+      c2 = (char)(c2 + ('a' - 'A'));
+    }
+    if (c1 != c2) {
+      return false;
+    }
+  }
+  return true;
+}
+
 tg3_str mmdgltf__tg3_make_str(mmdgltf_Arena* arena, const char* s) {
   tg3_str r;
   if (!s) {

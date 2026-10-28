@@ -4,65 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct TextureList {
-  mmdgltf_PmxTexture* items;
-  size_t count;
-  size_t capacity;
-} TextureList;
-
-static i32 get_or_add_texture(TextureList* tl, mmdgltf_Arena* arena, const char* path) {
-  if (!path || path[0] == '\0') {
-    return -1;
-  }
-  for (size_t i = 0; i < tl->count; ++i) {
-    if (strcmp(tl->items[i].path, path) == 0) {
-      return (i32)i;
-    }
-  }
-  if (tl->count >= tl->capacity) {
-    const size_t new_cap = tl->capacity ? tl->capacity * 2 : 16;
-    mmdgltf_PmxTexture* new_items =
-      mmdgltf__arena_alloc(arena, new_cap * sizeof(mmdgltf_PmxTexture));
-    if (!new_items) {
-      return -1;
-    }
-    if (tl->count > 0) {
-      memcpy(new_items, tl->items, tl->count * sizeof(mmdgltf_PmxTexture));
-    }
-    tl->items = new_items;
-    tl->capacity = new_cap;
-  }
-  const size_t idx = tl->count++;
-  tl->items[idx].path = mmdgltf__arena_strndup(arena, path, strlen(path));
-  return (i32)idx;
-}
-
-static bool ends_with_ci(const char* str, const char* suffix) {
-  if (!str || !suffix) {
-    return false;
-  }
-  const size_t str_len = strlen(str);
-  const size_t suf_len = strlen(suffix);
-  if (str_len < suf_len) {
-    return false;
-  }
-  const char* p = str + (str_len - suf_len);
-  for (size_t i = 0; i < suf_len; ++i) {
-    char c1 = p[i];
-    char c2 = suffix[i];
-    if (c1 >= 'A' && c1 <= 'Z') {
-      c1 = (char)(c1 + ('a' - 'A'));
-    }
-    if (c2 >= 'A' && c2 <= 'Z') {
-      c2 = (char)(c2 + ('a' - 'A'));
-    }
-    if (c1 != c2) {
-      return false;
-    }
-  }
-  return true;
-}
-
 static bool is_knee_bone(const char* name) {
   if (!name) {
     return false;
@@ -231,7 +172,7 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_stream(const mmdgltf_StreamFunc* func, 
     RET_ERR(stream.status);
   }
 
-  TextureList texture_list = {0};
+  mmdgltf__TextureList texture_list = {0};
   pmx->material_count = (size_t)material_count;
   if (material_count > 0) {
     pmx->materials =
@@ -292,30 +233,34 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmd_load_stream(const mmdgltf_StreamFunc* func, 
           *star = '\0';
           char* part1 = raw_tex;
           char* part2 = star + 1;
-          if (!ends_with_ci(part1, ".sph") && !ends_with_ci(part1, ".spa")) {
+          if (!mmdgltf__ends_with_ci(part1, ".sph") && !mmdgltf__ends_with_ci(part1, ".spa")) {
             diffuse_path = part1;
           } else {
             sphere_path = part1;
-            sp_mode = ends_with_ci(part1, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
+            sp_mode =
+              mmdgltf__ends_with_ci(part1, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
           }
           if (part2[0] != '\0') {
             sphere_path = part2;
-            sp_mode = ends_with_ci(part2, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
+            sp_mode =
+              mmdgltf__ends_with_ci(part2, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
           }
         } else {
-          if (ends_with_ci(raw_tex, ".sph") || ends_with_ci(raw_tex, ".spa")) {
+          if (mmdgltf__ends_with_ci(raw_tex, ".sph") || mmdgltf__ends_with_ci(raw_tex, ".spa")) {
             sphere_path = raw_tex;
-            sp_mode = ends_with_ci(raw_tex, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
+            sp_mode =
+              mmdgltf__ends_with_ci(raw_tex, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
           } else {
             diffuse_path = raw_tex;
           }
         }
 
         if (diffuse_path && diffuse_path[0] != '\0') {
-          m->texture_index = get_or_add_texture(&texture_list, arena, diffuse_path);
+          m->texture_index = mmdgltf__texture_list_get_or_add(&texture_list, arena, diffuse_path);
         }
         if (sphere_path && sphere_path[0] != '\0') {
-          m->sphere_texture_index = get_or_add_texture(&texture_list, arena, sphere_path);
+          m->sphere_texture_index =
+            mmdgltf__texture_list_get_or_add(&texture_list, arena, sphere_path);
           m->sphere_mode = sp_mode;
         }
       }
