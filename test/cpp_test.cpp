@@ -102,14 +102,14 @@ static void test_expected_monadic_operations() {
 }
 
 static void test_pmx_model_loading_and_getters() {
-  auto exp_model = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_NITORI_PMX);
+  auto exp_model = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_KYOUKO_PMX);
   assert(exp_model.has_value());
   assert(!exp_model->empty());
   assert(exp_model->raw() != nullptr);
 
   auto info = exp_model->model_info();
   assert(info.has_value());
-  assert(std::string(info->name_jp) == "河城にとり");
+  assert(std::string(info->name_jp) == "ぎゃてコラ風幽谷響子");
 
   auto header = exp_model->header();
   assert(header.has_value());
@@ -117,7 +117,7 @@ static void test_pmx_model_loading_and_getters() {
 
   auto vertices = exp_model->vertices();
   assert(vertices.has_value());
-  assert(vertices->size() == 29685);
+  assert(vertices->size() == 4434);
   assert(!vertices->empty());
   assert(vertices->data() != nullptr);
   assert((*vertices)[0].weight_type == MMDGLTF_WEIGHT_BDEF1);
@@ -127,47 +127,47 @@ static void test_pmx_model_loading_and_getters() {
     (void)v;
     count++;
   }
-  assert(count == 29685);
+  assert(count == 4434);
 
   auto indices = exp_model->indices();
   assert(indices.has_value());
-  assert(indices->size() == 131748);
+  assert(indices->size() == 22143);
 
   auto textures = exp_model->textures();
   assert(textures.has_value());
-  assert(textures->size() == 27);
-  assert(std::string((*textures)[0].path) == "Texture/tume.png");
+  assert(textures->size() == 5);
+  assert(std::string((*textures)[0].path) == "tx1.png");
 
   auto materials = exp_model->materials();
   assert(materials.has_value());
-  assert(materials->size() == 47);
-  assert(std::string((*materials)[0].name_jp) == "ツメ");
+  assert(materials->size() == 5);
+  assert(std::string((*materials)[0].name_jp) == "通常");
   assert((*materials)[0].diffuse.a == 1.0f);
 
   auto bones = exp_model->bones();
   assert(bones.has_value());
-  assert(bones->size() == 301);
-  assert(std::string((*bones)[0].name_jp) == "全ての親");
+  assert(bones->size() == 100);
+  assert(std::string((*bones)[0].name_jp) == "操作中心");
 
   auto morphs = exp_model->morphs();
   assert(morphs.has_value());
-  assert(morphs->size() == 168);
-  assert(std::string((*morphs)[0].name_jp) == "スフィア暗");
+  assert(morphs->size() == 52);
+  assert(std::string((*morphs)[0].name_jp) == "眉上げ");
 
   auto display_items = exp_model->display_items();
   assert(display_items.has_value());
-  assert(display_items->size() == 16);
+  assert(display_items->size() == 10);
   assert(std::string((*display_items)[0].name_jp) == "Root");
 
   auto rigid_bodies = exp_model->rigid_bodies();
   assert(rigid_bodies.has_value());
-  assert(rigid_bodies->size() == 81);
-  assert(std::string((*rigid_bodies)[0].name_jp) == "左胸親");
+  assert(rigid_bodies->size() == 30);
+  assert(std::string((*rigid_bodies)[0].name_jp) == "頭");
 
   auto joints = exp_model->joints();
   assert(joints.has_value());
-  assert(joints->size() == 39);
-  assert(std::string((*joints)[0].name_jp) == "左胸上");
+  assert(joints->size() == 24);
+  assert(std::string((*joints)[0].name_jp) == "前髪１");
 
   mmdgltf::PmxModel moved_model(std::move(*exp_model));
   assert(!moved_model.empty());
@@ -179,7 +179,7 @@ static void test_pmx_model_loading_and_getters() {
   assert(!assigned_model.empty());
   assert(moved_model.empty());
 
-  mmdgltf::PmxModel throw_model(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf::PmxModel throw_model(MMDGLTF_TEST_KYOUKO_PMX);
   assert(!throw_model.empty());
   bool threw = false;
   try {
@@ -191,11 +191,11 @@ static void test_pmx_model_loading_and_getters() {
   }
   assert(threw);
 
-  std::string path_str(MMDGLTF_TEST_NITORI_PMX);
+  std::string path_str(MMDGLTF_TEST_KYOUKO_PMX);
   auto exp_filen = mmdgltf::PmxModel::load_filen(path_str.data(), path_str.size());
   assert(exp_filen.has_value());
 
-  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   assert(f != nullptr);
   fseek(f, 0, SEEK_END);
   long sz = ftell(f);
@@ -207,7 +207,7 @@ static void test_pmx_model_loading_and_getters() {
   auto exp_mem = mmdgltf::PmxModel::load_memory(buf.data(), buf.size());
   assert(exp_mem.has_value());
 
-  f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   mmdgltf_StreamFunc sfunc = {
     [](void* b, size_t s, size_t n, void* src) { return fread(b, s, n, (FILE*)src); },
     [](void* src, long off, int org) { return fseek((FILE*)src, off, org); },
@@ -220,7 +220,7 @@ static void test_pmx_model_loading_and_getters() {
 }
 
 static void test_gpu_model_runtime() {
-  auto exp_pmx = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_NITORI_PMX);
+  auto exp_pmx = mmdgltf::PmxModel::load_file(MMDGLTF_TEST_KYOUKO_PMX);
   assert(exp_pmx.has_value());
 
   mmdgltf_ModelConfig cfg;
@@ -241,7 +241,7 @@ static void test_gpu_model_runtime() {
 
   auto vbufs = exp_model->vertex_buffers();
   assert(vbufs.has_value());
-  assert(vbufs->vertex_count == 29685);
+  assert(vbufs->vertex_count == 4434);
   assert(vbufs->positions != nullptr);
   assert(vbufs->normals != nullptr);
   assert(vbufs->uvs != nullptr);
@@ -250,31 +250,31 @@ static void test_gpu_model_runtime() {
 
   auto indices = exp_model->indices();
   assert(indices.has_value());
-  assert(indices->size() == 131748);
+  assert(indices->size() == 22143);
 
   auto materials = exp_model->materials();
   assert(materials.has_value());
-  assert(materials->size() == 47);
+  assert(materials->size() == 5);
 
   auto bones = exp_model->bones();
   assert(bones.has_value());
-  assert(bones->size() == 301);
+  assert(bones->size() == 100);
 
   auto morphs = exp_model->morphs();
   assert(morphs.has_value());
-  assert(morphs->size() == 168);
+  assert(morphs->size() == 52);
 
   auto rbs = exp_model->rigid_bodies();
   assert(rbs.has_value());
-  assert(rbs->size() == 81);
+  assert(rbs->size() == 30);
 
   auto joints = exp_model->joints();
   assert(joints.has_value());
-  assert(joints->size() == 39);
+  assert(joints->size() == 24);
 
   auto images = exp_model->images();
   assert(images.has_value());
-  assert(images->size() == 27);
+  assert(images->size() == 5);
   assert((*images)[0].data != nullptr);
   assert((*images)[0].size > 0);
   assert(std::string((*images)[0].mime_type) == "image/png");
@@ -292,10 +292,11 @@ static void test_gpu_model_runtime() {
 
 static void test_fastpath_cpp() {
   const char* out_file = "/tmp/test_cpp_fastpath.glb";
-  auto status = mmdgltf::convert_file(MMDGLTF_TEST_NITORI_PMX, out_file);
+  auto status = mmdgltf::convert_file(MMDGLTF_TEST_KYOUKO_PMX, out_file);
   assert(status == MMDGLTF_OK);
+  remove(out_file);
 
-  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   assert(f != nullptr);
   fseek(f, 0, SEEK_END);
   long fsz = ftell(f);
@@ -315,7 +316,7 @@ static void test_fastpath_cpp() {
   mmdgltf::ExportConfig cfg;
   mmdgltf_export_config_default(&cfg);
   cfg.format = MMDGLTF_FORMAT_GLTF;
-  auto status_gltf = mmdgltf::convert_file(MMDGLTF_TEST_NITORI_PMX, out_gltf, &cfg);
+  auto status_gltf = mmdgltf::convert_file(MMDGLTF_TEST_KYOUKO_PMX, out_gltf, &cfg);
   assert(status_gltf == MMDGLTF_OK);
   remove("/tmp/test_cpp_fastpath.gltf");
   remove("/tmp/test_cpp_fastpath.bin");

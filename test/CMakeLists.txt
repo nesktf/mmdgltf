@@ -11,7 +11,12 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} $ENV{CFLAGS} -Wall -Wextra -Wpedantic -Wno-p
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -g2 -ggdb -fsanitize=address,leak")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS} -O3")
 
-#set(TESTFILES "${CMAKE_CURRENT_SOURCE_DIR}/files")
+set(MODELS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../models")
+get_filename_component(MODELS_DIR "${MODELS_DIR}" ABSOLUTE)
+set(MMDGLTF_MODELS_DIR "${MODELS_DIR}")
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/paths.h.in" "${CMAKE_CURRENT_BINARY_DIR}/paths.h" @ONLY)
+
 file(GLOB MMDGLTF_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
 
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/munit/munit.c")
@@ -29,6 +34,7 @@ endif()
 add_executable(${PROJECT_NAME} ${MMDGLTF_TEST_SRC} ${munit_SOURCE_DIR}/munit.c)
 target_include_directories(${PROJECT_NAME}
   PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/../src"
   "${munit_SOURCE_DIR}"
@@ -43,7 +49,12 @@ if (CMAKE_CXX_COMPILER)
   enable_language(CXX)
   add_executable(mmdgltf_cpp_test cpp_test.cpp)
   set_target_properties(mmdgltf_cpp_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-  target_include_directories(mmdgltf_cpp_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+  target_include_directories(mmdgltf_cpp_test
+    PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include"
+  )
   target_link_libraries(mmdgltf_cpp_test PRIVATE mmdgltf)
   add_test(NAME cpp_test COMMAND mmdgltf_cpp_test)
 endif()

@@ -7,7 +7,7 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
@@ -21,15 +21,15 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   munit_assert_uint8(header.vertex_index_size, ==, 2);
   munit_assert_uint8(header.texture_index_size, ==, 1);
   munit_assert_uint8(header.material_index_size, ==, 1);
-  munit_assert_uint8(header.bone_index_size, ==, 2);
-  munit_assert_uint8(header.morph_index_size, ==, 2);
+  munit_assert_uint8(header.bone_index_size, ==, 1);
+  munit_assert_uint8(header.morph_index_size, ==, 1);
   munit_assert_uint8(header.rigid_index_size, ==, 1);
 
   mmdgltf_PmxModelInfo info;
   ret = mmdgltf_pmx_get_model_info(pmx, &info);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_string_equal(info.name_jp, "河城にとり");
-  munit_assert_string_equal(info.name_en, "+");
+  munit_assert_string_equal(info.name_jp, "ぎゃてコラ風幽谷響子");
+  munit_assert_string_equal(info.name_en, "");
   munit_assert_ptr_not_null(info.comment_jp);
   munit_assert_ptr_not_null(info.comment_en);
 
@@ -37,7 +37,7 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   size_t vertex_count = 0;
   ret = mmdgltf_pmx_vertices(pmx, &vertices, &vertex_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(vertex_count, ==, 29685);
+  munit_assert_size(vertex_count, ==, 4434);
   munit_assert_ptr_not_null(vertices);
   munit_assert_int(vertices[0].weight_type, ==, MMDGLTF_WEIGHT_BDEF1);
   munit_assert_int32(vertices[0].bones[0], >=, 0);
@@ -48,20 +48,20 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   size_t index_count = 0;
   ret = mmdgltf_pmx_indices(pmx, &indices, &index_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(index_count, ==, 131748);
+  munit_assert_size(index_count, ==, 22143);
   munit_assert_ptr_not_null(indices);
   for (size_t i = 0; i < 100; ++i) {
-    munit_assert_uint32(indices[i], <, 29685);
+    munit_assert_uint32(indices[i], <, 4434);
   }
 
   const mmdgltf_PmxTexture* textures = NULL;
   size_t texture_count = 0;
   ret = mmdgltf_pmx_textures(pmx, &textures, &texture_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(texture_count, ==, 27);
+  munit_assert_size(texture_count, ==, 5);
   munit_assert_ptr_not_null(textures);
-  munit_assert_string_equal(textures[0].path, "Texture/tume.png");
-  munit_assert_string_equal(textures[1].path, "Sphere/s_takane_01.png");
+  munit_assert_string_equal(textures[0].path, "tx1.png");
+  munit_assert_string_equal(textures[1].path, "tx2.png");
   for (size_t i = 0; i < texture_count; ++i) {
     munit_assert_ptr_not_null(textures[i].path);
     munit_assert_null(strchr(textures[i].path, '\\'));
@@ -71,51 +71,45 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   size_t material_count = 0;
   ret = mmdgltf_pmx_materials(pmx, &materials, &material_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(material_count, ==, 47);
+  munit_assert_size(material_count, ==, 5);
   munit_assert_ptr_not_null(materials);
-  munit_assert_string_equal(materials[0].name_jp, "ツメ");
+  munit_assert_string_equal(materials[0].name_jp, "通常");
   munit_assert_float(materials[0].diffuse.a, ==, 1.0f);
-  munit_assert_uint32(materials[0].index_count, ==, 390);
+  munit_assert_uint32(materials[0].index_count, ==, 16401);
   munit_assert_int32(materials[0].texture_index, ==, 0);
-  munit_assert_int32(materials[0].sphere_texture_index, ==, 1);
-  munit_assert_int(materials[0].sphere_mode, ==, MMDGLTF_SPHERE_ADD);
 
   size_t total_mat_indices = 0;
   for (size_t i = 0; i < material_count; ++i) {
     total_mat_indices += materials[i].index_count;
   }
-  munit_assert_size(total_mat_indices, ==, 131748);
+  munit_assert_size(total_mat_indices, ==, 22143);
 
   const mmdgltf_PmxBone* bones = NULL;
   size_t bone_count = 0;
   ret = mmdgltf_pmx_bones(pmx, &bones, &bone_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(bone_count, ==, 301);
+  munit_assert_size(bone_count, ==, 100);
   munit_assert_ptr_not_null(bones);
-  munit_assert_string_equal(bones[0].name_jp, "全ての親");
+  munit_assert_string_equal(bones[0].name_jp, "操作中心");
   munit_assert_int32(bones[0].parent_index, ==, -1);
   munit_assert_float(bones[0].position.x, ==, 0.0f);
-  munit_assert_int32(bones[97].ik_target_index, >=, 0);
-  munit_assert_uint32(bones[97].ik_link_count, ==, 1);
-  munit_assert_ptr_not_null(bones[97].ik_links);
 
   const mmdgltf_PmxMorph* morphs = NULL;
   size_t morph_count = 0;
   ret = mmdgltf_pmx_morphs(pmx, &morphs, &morph_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(morph_count, ==, 168);
+  munit_assert_size(morph_count, ==, 52);
   munit_assert_ptr_not_null(morphs);
-  munit_assert_string_equal(morphs[0].name_jp, "スフィア暗");
-  munit_assert_int(morphs[0].type, ==, MMDGLTF_MORPH_MATERIAL);
-  munit_assert_uint32(morphs[0].offset_count, ==, 1);
-  munit_assert_ptr_not_null(morphs[0].material_offsets);
-  munit_assert_float(morphs[0].material_offsets[0].sphere_texture_factor.r, ==, -3.0f);
+  munit_assert_string_equal(morphs[0].name_jp, "眉上げ");
+  munit_assert_int(morphs[0].type, ==, MMDGLTF_MORPH_VERTEX);
+  munit_assert_uint32(morphs[0].offset_count, ==, 100);
+  munit_assert_ptr_not_null(morphs[0].vertex_offsets);
 
   const mmdgltf_PmxDisplayItem* display_items = NULL;
   size_t display_item_count = 0;
   ret = mmdgltf_pmx_display_items(pmx, &display_items, &display_item_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(display_item_count, ==, 16);
+  munit_assert_size(display_item_count, ==, 10);
   munit_assert_ptr_not_null(display_items);
   munit_assert_string_equal(display_items[0].name_jp, "Root");
   munit_assert_uint8(display_items[0].is_special, ==, 1);
@@ -125,10 +119,10 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   size_t rigid_body_count = 0;
   ret = mmdgltf_pmx_rigid_bodies(pmx, &rigid_bodies, &rigid_body_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(rigid_body_count, ==, 81);
+  munit_assert_size(rigid_body_count, ==, 30);
   munit_assert_ptr_not_null(rigid_bodies);
-  munit_assert_string_equal(rigid_bodies[0].name_jp, "左胸親");
-  munit_assert_int32(rigid_bodies[0].bone_index, ==, 77);
+  munit_assert_string_equal(rigid_bodies[0].name_jp, "頭");
+  munit_assert_int32(rigid_bodies[0].bone_index, ==, 8);
   munit_assert_int(rigid_bodies[0].shape_type, ==, MMDGLTF_RIGID_SHAPE_SPHERE);
   munit_assert_int(rigid_bodies[0].physics_mode, ==, MMDGLTF_RIGID_MODE_STATIC);
   munit_assert_float(rigid_bodies[0].size.x, >, 0.0f);
@@ -137,22 +131,22 @@ static MunitResult test_load_pmx_file(const MunitParameter* params, void* data) 
   size_t joint_count = 0;
   ret = mmdgltf_pmx_joints(pmx, &joints, &joint_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(joint_count, ==, 39);
+  munit_assert_size(joint_count, ==, 24);
   munit_assert_ptr_not_null(joints);
-  munit_assert_string_equal(joints[0].name_jp, "左胸上");
+  munit_assert_string_equal(joints[0].name_jp, "前髪１");
   munit_assert_int32(joints[0].src_rigid, ==, 0);
-  munit_assert_int32(joints[0].dest_rigid, ==, 2);
+  munit_assert_int32(joints[0].dest_rigid, ==, 1);
   munit_assert_float(joints[0].position.y, >, 0.0f);
 
   mmdgltf_pmx_destroy(pmx);
 
   // same thing with non null terminated string
-  pmx = mmdgltf_load_filen(MMDGLTF_TEST_NITORI_PMX, strlen(MMDGLTF_TEST_NITORI_PMX));
+  pmx = mmdgltf_load_filen(MMDGLTF_TEST_KYOUKO_PMX, strlen(MMDGLTF_TEST_KYOUKO_PMX));
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
   munit_assert_int(mmdgltf_pmx_get_model_info(pmx, &info), ==, MMDGLTF_OK);
-  munit_assert_string_equal(info.name_jp, "河城にとり");
+  munit_assert_string_equal(info.name_jp, "ぎゃてコラ風幽谷響子");
 
   mmdgltf_pmx_destroy(pmx);
 
@@ -167,7 +161,7 @@ static MunitResult test_load_pmx_stream(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   munit_assert_ptr_not_null(f);
 
   const mmdgltf_StreamFunc func = {
@@ -185,7 +179,7 @@ static MunitResult test_load_pmx_stream(const MunitParameter* params, void* data
 
   mmdgltf_PmxModelInfo info;
   munit_assert_int(mmdgltf_pmx_get_model_info(pmx, &info), ==, MMDGLTF_OK);
-  munit_assert_string_equal(info.name_jp, "河城にとり");
+  munit_assert_string_equal(info.name_jp, "ぎゃてコラ風幽谷響子");
 
   mmdgltf_pmx_destroy(pmx);
   return MUNIT_OK;
@@ -195,7 +189,7 @@ static MunitResult test_load_pmx_memory(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   munit_assert_ptr_not_null(f);
 
   fseek(f, 0, SEEK_END);
@@ -215,7 +209,7 @@ static MunitResult test_load_pmx_memory(const MunitParameter* params, void* data
 
   mmdgltf_PmxModelInfo info;
   munit_assert_int(mmdgltf_pmx_get_model_info(pmx, &info), ==, MMDGLTF_OK);
-  munit_assert_string_equal(info.name_jp, "河城にとり");
+  munit_assert_string_equal(info.name_jp, "ぎゃてコラ風幽谷響子");
 
   mmdgltf_pmx_destroy(pmx);
   return MUNIT_OK;

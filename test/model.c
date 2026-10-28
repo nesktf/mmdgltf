@@ -5,7 +5,7 @@ static MunitResult test_model_create_default(const MunitParameter* params, void*
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
@@ -19,7 +19,7 @@ static MunitResult test_model_create_default(const MunitParameter* params, void*
   mmdgltf_VertexBuffers bufs;
   mmdgltf_Status ret = mmdgltf_model_vertex_buffers(model, &bufs);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(bufs.vertex_count, ==, 29685);
+  munit_assert_size(bufs.vertex_count, ==, 4434);
   munit_assert_ptr_not_null(bufs.positions);
   munit_assert_ptr_not_null(bufs.normals);
   munit_assert_ptr_not_null(bufs.uvs);
@@ -30,53 +30,53 @@ static MunitResult test_model_create_default(const MunitParameter* params, void*
   size_t index_count = 0;
   ret = mmdgltf_model_indices(model, &indices, &index_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(index_count, ==, 131748);
+  munit_assert_size(index_count, ==, 22143);
   munit_assert_ptr_not_null(indices);
 
   const mmdgltf_PmxMaterial* materials = NULL;
   size_t material_count = 0;
   ret = mmdgltf_model_materials(model, &materials, &material_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(material_count, ==, 47);
+  munit_assert_size(material_count, ==, 5);
   munit_assert_ptr_not_null(materials);
-  munit_assert_string_equal(materials[0].name_jp, "ツメ");
+  munit_assert_string_equal(materials[0].name_jp, "通常");
 
   const mmdgltf_PmxBone* bones = NULL;
   size_t bone_count = 0;
   ret = mmdgltf_model_bones(model, &bones, &bone_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(bone_count, ==, 301);
+  munit_assert_size(bone_count, ==, 100);
   munit_assert_ptr_not_null(bones);
-  munit_assert_string_equal(bones[0].name_jp, "全ての親");
+  munit_assert_string_equal(bones[0].name_jp, "操作中心");
 
   const mmdgltf_PmxMorph* morphs = NULL;
   size_t morph_count = 0;
   ret = mmdgltf_model_morphs(model, &morphs, &morph_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(morph_count, ==, 168);
+  munit_assert_size(morph_count, ==, 52);
   munit_assert_ptr_not_null(morphs);
 
   const mmdgltf_PmxRigidBody* rigid_bodies = NULL;
   size_t rigid_body_count = 0;
   ret = mmdgltf_model_rigid_bodies(model, &rigid_bodies, &rigid_body_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(rigid_body_count, ==, 81);
+  munit_assert_size(rigid_body_count, ==, 30);
   munit_assert_ptr_not_null(rigid_bodies);
-  munit_assert_string_equal(rigid_bodies[0].name_jp, "左胸親");
+  munit_assert_string_equal(rigid_bodies[0].name_jp, "頭");
 
   const mmdgltf_PmxJoint* joints = NULL;
   size_t joint_count = 0;
   ret = mmdgltf_model_joints(model, &joints, &joint_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(joint_count, ==, 39);
+  munit_assert_size(joint_count, ==, 24);
   munit_assert_ptr_not_null(joints);
-  munit_assert_string_equal(joints[0].name_jp, "左胸上");
+  munit_assert_string_equal(joints[0].name_jp, "前髪１");
 
   const mmdgltf_Image* images = NULL;
   size_t image_count = 0;
   ret = mmdgltf_model_images(model, &images, &image_count);
   munit_assert_int(ret, ==, MMDGLTF_OK);
-  munit_assert_size(image_count, ==, 27);
+  munit_assert_size(image_count, ==, 5);
   munit_assert_ptr_not_null(images);
   for (size_t i = 0; i < image_count; ++i) {
     munit_assert_ptr_not_null(images[i].data);
@@ -99,7 +99,7 @@ static MunitResult test_model_coordinate_transforms(const MunitParameter* params
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg_rh;
@@ -170,7 +170,7 @@ static MunitResult test_model_selective_loading(const MunitParameter* params, vo
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg;
@@ -182,7 +182,7 @@ static MunitResult test_model_selective_loading(const MunitParameter* params, vo
 
   mmdgltf_VertexBuffers bufs;
   munit_assert_int(mmdgltf_model_vertex_buffers(model_vert_only, &bufs), ==, MMDGLTF_OK);
-  munit_assert_size(bufs.vertex_count, ==, 29685);
+  munit_assert_size(bufs.vertex_count, ==, 4434);
   munit_assert_ptr_not_null(bufs.positions);
 
   const mmdgltf_PmxMaterial* mats = NULL;
@@ -208,13 +208,13 @@ static MunitResult test_model_selective_loading(const MunitParameter* params, vo
   munit_assert_null(bufs.positions);
 
   munit_assert_int(mmdgltf_model_bones(model_bones_phys, &bones, &bone_count), ==, MMDGLTF_OK);
-  munit_assert_size(bone_count, ==, 301);
+  munit_assert_size(bone_count, ==, 100);
   munit_assert_ptr_not_null(bones);
 
   const mmdgltf_PmxRigidBody* rbs = NULL;
   size_t rb_count = 0;
   munit_assert_int(mmdgltf_model_rigid_bodies(model_bones_phys, &rbs, &rb_count), ==, MMDGLTF_OK);
-  munit_assert_size(rb_count, ==, 81);
+  munit_assert_size(rb_count, ==, 30);
   munit_assert_ptr_not_null(rbs);
 
   mmdgltf_model_destroy(model_bones_phys);
@@ -227,7 +227,7 @@ static MunitResult test_model_textures_format_transcode(const MunitParameter* pa
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg;
@@ -243,14 +243,9 @@ static MunitResult test_model_textures_format_transcode(const MunitParameter* pa
   const mmdgltf_Image* images = NULL;
   size_t count = 0;
   munit_assert_int(mmdgltf_model_images(model, &images, &count), ==, MMDGLTF_OK);
-  munit_assert_size(count, ==, 27);
+  munit_assert_size(count, ==, 5);
 
   const uint8_t png_magic[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-
-  bool found_bmp = false;
-  bool found_tga = false;
-  bool found_spa = false;
-  bool found_png = false;
 
   for (size_t i = 0; i < count; ++i) {
     const mmdgltf_Image* img = &images[i];
@@ -261,27 +256,43 @@ static MunitResult test_model_textures_format_transcode(const MunitParameter* pa
     munit_assert_int(img->channels, >, 0);
     munit_assert_string_equal(img->mime_type, "image/png");
     munit_assert_memory_equal(8, img->data, png_magic);
+  }
 
+  mmdgltf_model_destroy(model);
+
+  // PMD model to verify BMP and SPH/SPA transcoding to PNG
+  pmx = mmdgltf_load_file(MMDGLTF_TEST_METAL_PMD);
+  munit_assert_ptr_not_null(pmx);
+  model = mmdgltf_model_create(pmx, &cfg);
+  mmdgltf_pmx_destroy(pmx);
+  munit_assert_ptr_not_null(model);
+  munit_assert_int(MMDGLTF_CHECK(model), ==, MMDGLTF_OK);
+
+  images = NULL;
+  count = 0;
+  munit_assert_int(mmdgltf_model_images(model, &images, &count), ==, MMDGLTF_OK);
+  munit_assert_size(count, >, 0);
+
+  bool found_bmp = false;
+  bool found_sph = false;
+  for (size_t i = 0; i < count; ++i) {
+    const mmdgltf_Image* img = &images[i];
+    munit_assert_ptr_not_null(img->data);
+    munit_assert_size(img->size, >, 0);
+    munit_assert_string_equal(img->mime_type, "image/png");
+    munit_assert_memory_equal(8, img->data, png_magic);
     if (strstr(img->path, ".bmp") || strstr(img->path, ".BMP")) {
       found_bmp = true;
     }
-    if (strstr(img->path, ".tga") || strstr(img->path, ".TGA")) {
-      found_tga = true;
-    }
-    if (strstr(img->path, ".spa") || strstr(img->path, ".SPA")) {
-      found_spa = true;
-    }
-    if (strstr(img->path, ".png") || strstr(img->path, ".PNG")) {
-      found_png = true;
+    if (strstr(img->path, ".sph") || strstr(img->path, ".SPH") ||
+        strstr(img->path, ".spa") || strstr(img->path, ".SPA")) {
+      found_sph = true;
     }
   }
-
   munit_assert_true(found_bmp);
-  munit_assert_true(found_tga);
-  munit_assert_true(found_spa);
-  munit_assert_true(found_png);
-
+  munit_assert_true(found_sph);
   mmdgltf_model_destroy(model);
+
   return MUNIT_OK;
 }
 
@@ -290,7 +301,7 @@ static MunitResult test_model_textures_missing_strict_vs_lenient(const MunitPara
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg_lenient;
@@ -306,7 +317,7 @@ static MunitResult test_model_textures_missing_strict_vs_lenient(const MunitPara
   const mmdgltf_Image* images = NULL;
   size_t count = 0;
   munit_assert_int(mmdgltf_model_images(model_lenient, &images, &count), ==, MMDGLTF_OK);
-  munit_assert_size(count, ==, 27);
+  munit_assert_size(count, ==, 5);
   for (size_t i = 0; i < count; ++i) {
     munit_assert_null(images[i].data);
     munit_assert_size(images[i].size, ==, 0);

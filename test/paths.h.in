@@ -1,0 +1,11 @@
+#ifndef MMDGLTF_PATHS_H
+#define MMDGLTF_PATHS_H
+
+#define MMDGLTF_MODELS_DIR      "@MODELS_DIR@"
+#define MMDGLTF_TEST_KYOUKO_PMX "@MODELS_DIR@/kyouko_doodle/kyouko_doodle.pmx"
+#define MMDGLTF_TEST_MIKU_PMD   "@MODELS_DIR@/default/Miku_Hatsune.pmd"
+#define MMDGLTF_TEST_DAMMY_PMD  "@MODELS_DIR@/default/Dammy_Bone.pmd"
+#define MMDGLTF_TEST_METAL_PMD  "@MODELS_DIR@/default/Miku_Hatsune_metal.pmd"
+#define MMDGLTF_TEST_LUKA_PMD   "@MODELS_DIR@/default/Luka_Megurine.pmd"
+
+#endif // MMDGLTF_PATHS_H

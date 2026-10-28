@@ -17,7 +17,7 @@ static MunitResult test_fastpath_memory(const MunitParameter* params, void* data
   UNUSED(params);
   UNUSED(data);
 
-  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   munit_assert_ptr_not_null(f);
   fseek(f, 0, SEEK_END);
   long fsz = ftell(f);
@@ -58,10 +58,10 @@ static MunitResult test_fastpath_memory(const MunitParameter* params, void* data
   tg3_error_code perr = tg3_parse_glb(&parsed, &es, glb_data, glb_size, NULL, 0, &opts);
   munit_assert_int(perr, ==, TG3_OK);
   munit_assert_uint32(parsed.meshes_count, ==, 1);
-  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 47);
-  munit_assert_uint32(parsed.materials_count, ==, 47);
+  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 5);
+  munit_assert_uint32(parsed.materials_count, ==, 5);
   munit_assert_uint32(parsed.skins_count, ==, 1);
-  munit_assert_uint32(parsed.skins[0].joints_count, ==, 301);
+  munit_assert_uint32(parsed.skins[0].joints_count, ==, 100);
   munit_assert_uint32(parsed.scenes_count, ==, 1);
 
   const i32 prim0_indices_acc = parsed.meshes[0].primitives[0].indices;
@@ -80,8 +80,8 @@ static MunitResult test_fastpath_file(const MunitParameter* params, void* data) 
   UNUSED(params);
   UNUSED(data);
 
-  const char* out_file = "/tmp/test_nitori_fastpath.glb";
-  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_file, NULL);
+  const char* out_file = "/tmp/test_kyouko_fastpath.glb";
+  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_KYOUKO_PMX, out_file, NULL);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
   tg3_model parsed;
@@ -94,13 +94,14 @@ static MunitResult test_fastpath_file(const MunitParameter* params, void* data) 
   tg3_error_code perr = tg3_parse_file(&parsed, &es, out_file, (u32)strlen(out_file), &opts);
   munit_assert_int(perr, ==, TG3_OK);
   munit_assert_uint32(parsed.meshes_count, ==, 1);
-  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 47);
-  munit_assert_uint32(parsed.materials_count, ==, 47);
+  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 5);
+  munit_assert_uint32(parsed.materials_count, ==, 5);
   munit_assert_uint32(parsed.skins_count, ==, 1);
-  munit_assert_uint32(parsed.skins[0].joints_count, ==, 301);
+  munit_assert_uint32(parsed.skins[0].joints_count, ==, 100);
 
   tg3_error_stack_free(&es);
   tg3_model_free(&parsed);
+  remove(out_file);
 
   return MUNIT_OK;
 }
@@ -109,14 +110,14 @@ static MunitResult test_fastpath_gltf_file(const MunitParameter* params, void* d
   UNUSED(params);
   UNUSED(data);
 
-  const char* out_file = "/tmp/test_nitori_fastpath.gltf";
+  const char* out_file = "/tmp/test_kyouko_fastpath.gltf";
   mmdgltf_ExportConfig cfg;
   mmdgltf_export_config_default(&cfg);
   cfg.format = MMDGLTF_FORMAT_GLTF;
-  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_file, &cfg);
+  mmdgltf_Status st = mmdgltf_convert_file(MMDGLTF_TEST_KYOUKO_PMX, out_file, &cfg);
   munit_assert_int(st, ==, MMDGLTF_OK);
 
-  FILE* fbin = fopen("/tmp/test_nitori_fastpath.bin", "rb");
+  FILE* fbin = fopen("/tmp/test_kyouko_fastpath.bin", "rb");
   munit_assert_ptr_not_null(fbin);
   fclose(fbin);
 
@@ -130,13 +131,16 @@ static MunitResult test_fastpath_gltf_file(const MunitParameter* params, void* d
   tg3_error_code perr = tg3_parse_file(&parsed, &es, out_file, (u32)strlen(out_file), &opts);
   munit_assert_int(perr, ==, TG3_OK);
   munit_assert_uint32(parsed.meshes_count, ==, 1);
-  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 47);
-  munit_assert_uint32(parsed.materials_count, ==, 47);
+  munit_assert_uint32(parsed.meshes[0].primitives_count, ==, 5);
+  munit_assert_uint32(parsed.materials_count, ==, 5);
   munit_assert_uint32(parsed.skins_count, ==, 1);
-  munit_assert_uint32(parsed.skins[0].joints_count, ==, 301);
+  munit_assert_uint32(parsed.skins[0].joints_count, ==, 100);
 
   tg3_error_stack_free(&es);
   tg3_model_free(&parsed);
+
+  remove("/tmp/test_kyouko_fastpath.gltf");
+  remove("/tmp/test_kyouko_fastpath.bin");
 
   return MUNIT_OK;
 }
@@ -153,13 +157,13 @@ static MunitResult test_fastpath_bone_names(const MunitParameter* params, void* 
   mmdgltf_export_config_default(&cfg_en);
   cfg_en.english_bone_names = 1;
 
-  const char* out_jp = "/tmp/test_nitori_jp.glb";
-  const char* out_en = "/tmp/test_nitori_en.glb";
+  const char* out_jp = "/tmp/test_kyouko_jp.glb";
+  const char* out_en = "/tmp/test_kyouko_en.glb";
 
-  mmdgltf_Status st_jp = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_jp, &cfg_jp);
+  mmdgltf_Status st_jp = mmdgltf_convert_file(MMDGLTF_TEST_KYOUKO_PMX, out_jp, &cfg_jp);
   munit_assert_int(st_jp, ==, MMDGLTF_OK);
 
-  mmdgltf_Status st_en = mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, out_en, &cfg_en);
+  mmdgltf_Status st_en = mmdgltf_convert_file(MMDGLTF_TEST_KYOUKO_PMX, out_en, &cfg_en);
   munit_assert_int(st_en, ==, MMDGLTF_OK);
 
   tg3_model parsed_jp, parsed_en;
@@ -207,7 +211,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
   UNUSED(data);
 
   const double t0_std = get_time_sec();
-  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_KYOUKO_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
@@ -235,7 +239,7 @@ static MunitResult test_fastpath_parity_and_benchmark(const MunitParameter* para
   u8* fast_glb_data = NULL;
   size_t fast_glb_size = 0;
 
-  FILE* f = fopen(MMDGLTF_TEST_NITORI_PMX, "rb");
+  FILE* f = fopen(MMDGLTF_TEST_KYOUKO_PMX, "rb");
   munit_assert_ptr_not_null(f);
   fseek(f, 0, SEEK_END);
   long fsz = ftell(f);
@@ -485,7 +489,7 @@ static MunitResult test_fastpath_errors(const MunitParameter* params, void* data
 
   munit_assert_int(mmdgltf_convert_file(NULL, "/tmp/out.glb", NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
-  munit_assert_int(mmdgltf_convert_file(MMDGLTF_TEST_NITORI_PMX, NULL, NULL), ==,
+  munit_assert_int(mmdgltf_convert_file(MMDGLTF_TEST_KYOUKO_PMX, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_convert_file(MMDGLTF_TEST_MIKU_PMD, NULL, NULL), ==,
                    MMDGLTF_ERROR_INVALID_ARGUMENT);
