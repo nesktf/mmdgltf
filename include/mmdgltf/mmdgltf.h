@@ -369,12 +369,25 @@ typedef enum mmdgltf_CoordinateSystem {
 #define MMDGLTF_LOAD_BONES     0x0004
 #define MMDGLTF_LOAD_MORPHS    0x0008
 #define MMDGLTF_LOAD_PHYSICS   0x0010
-#define MMDGLTF_LOAD_ALL       0x001F
+#define MMDGLTF_LOAD_TEXTURES  0x0020
+#define MMDGLTF_LOAD_ALL       0x003F
+
+typedef struct mmdgltf_Image {
+  const uint8_t* data;
+  size_t size;
+  const char* mime_type;
+  int32_t width;
+  int32_t height;
+  int32_t channels;
+  const char* path;
+} mmdgltf_Image;
 
 typedef struct mmdgltf_ModelConfig {
   uint32_t load_flags;
   mmdgltf_CoordinateSystem coordinate_system;
   float scale;
+  const char* base_dir;
+  uint8_t strict_textures;
 } mmdgltf_ModelConfig;
 
 typedef struct mmdgltf_VertexBuffers {
@@ -402,6 +415,9 @@ MMDGLTF_API mmdgltf_Status mmdgltf_model_indices(mmdgltf_Model model, const uint
 MMDGLTF_API mmdgltf_Status mmdgltf_model_materials(mmdgltf_Model model,
                                                    const mmdgltf_PmxMaterial** out_materials,
                                                    size_t* out_count);
+MMDGLTF_API mmdgltf_Status mmdgltf_model_images(mmdgltf_Model model,
+                                                const mmdgltf_Image** out_images,
+                                                size_t* out_count);
 MMDGLTF_API mmdgltf_Status mmdgltf_model_bones(mmdgltf_Model model,
                                                const mmdgltf_PmxBone** out_bones,
                                                size_t* out_count);

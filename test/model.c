@@ -74,6 +74,25 @@ static MunitResult test_model_create_default(const MunitParameter* params, void*
   munit_assert_ptr_not_null(joints);
   munit_assert_string_equal(joints[0].name_jp, "左胸上");
 
+  const mmdgltf_Image* images = NULL;
+  size_t image_count = 0;
+  ret = mmdgltf_model_images(model, &images, &image_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(image_count, ==, 27);
+  munit_assert_ptr_not_null(images);
+  for (size_t i = 0; i < image_count; ++i) {
+    munit_assert_ptr_not_null(images[i].data);
+    munit_assert_size(images[i].size, >, 0);
+    munit_assert_ptr_not_null(images[i].mime_type);
+    munit_assert_int(images[i].width, >, 0);
+    munit_assert_int(images[i].height, >, 0);
+    munit_assert_int(images[i].channels, >, 0);
+    munit_assert_ptr_not_null(images[i].path);
+    const bool valid_mime = (strcmp(images[i].mime_type, "image/png") == 0 ||
+                             strcmp(images[i].mime_type, "image/jpeg") == 0);
+    munit_assert_true(valid_mime);
+  }
+
   mmdgltf_model_destroy(model);
   return MUNIT_OK;
 }
@@ -206,6 +225,110 @@ static MunitResult test_model_selective_loading(const MunitParameter* params, vo
   return MUNIT_OK;
 }
 
+static MunitResult test_model_textures_format_transcode(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  munit_assert_ptr_not_null(pmx);
+
+  mmdgltf_ModelConfig cfg;
+  mmdgltf_model_config_default(&cfg);
+  cfg.load_flags = MMDGLTF_LOAD_TEXTURES;
+
+  mmdgltf_Model model = mmdgltf_model_create(pmx, &cfg);
+  mmdgltf_pmx_destroy(pmx);
+
+  munit_assert_ptr_not_null(model);
+  munit_assert_int(MMDGLTF_CHECK(model), ==, MMDGLTF_OK);
+
+  const mmdgltf_Image* images = NULL;
+  size_t count = 0;
+  munit_assert_int(mmdgltf_model_images(model, &images, &count), ==, MMDGLTF_OK);
+  munit_assert_size(count, ==, 27);
+
+  const uint8_t png_magic[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+
+  bool found_bmp = false;
+  bool found_tga = false;
+  bool found_spa = false;
+  bool found_png = false;
+
+  for (size_t i = 0; i < count; ++i) {
+    const mmdgltf_Image* img = &images[i];
+    munit_assert_ptr_not_null(img->data);
+    munit_assert_size(img->size, >, 0);
+    munit_assert_int(img->width, >, 0);
+    munit_assert_int(img->height, >, 0);
+    munit_assert_int(img->channels, >, 0);
+    munit_assert_string_equal(img->mime_type, "image/png");
+    munit_assert_memory_equal(8, img->data, png_magic);
+
+    if (strstr(img->path, ".bmp") || strstr(img->path, ".BMP")) {
+      found_bmp = true;
+    }
+    if (strstr(img->path, ".tga") || strstr(img->path, ".TGA")) {
+      found_tga = true;
+    }
+    if (strstr(img->path, ".spa") || strstr(img->path, ".SPA")) {
+      found_spa = true;
+    }
+    if (strstr(img->path, ".png") || strstr(img->path, ".PNG")) {
+      found_png = true;
+    }
+  }
+
+  munit_assert_true(found_bmp);
+  munit_assert_true(found_tga);
+  munit_assert_true(found_spa);
+  munit_assert_true(found_png);
+
+  mmdgltf_model_destroy(model);
+  return MUNIT_OK;
+}
+
+static MunitResult test_model_textures_missing_strict_vs_lenient(const MunitParameter* params,
+                                                                 void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  munit_assert_ptr_not_null(pmx);
+
+  mmdgltf_ModelConfig cfg_lenient;
+  mmdgltf_model_config_default(&cfg_lenient);
+  cfg_lenient.load_flags = MMDGLTF_LOAD_TEXTURES;
+  cfg_lenient.base_dir = "nonexistent_dir_12345";
+  cfg_lenient.strict_textures = 0;
+
+  mmdgltf_Model model_lenient = mmdgltf_model_create(pmx, &cfg_lenient);
+  munit_assert_ptr_not_null(model_lenient);
+  munit_assert_int(MMDGLTF_CHECK(model_lenient), ==, MMDGLTF_OK);
+
+  const mmdgltf_Image* images = NULL;
+  size_t count = 0;
+  munit_assert_int(mmdgltf_model_images(model_lenient, &images, &count), ==, MMDGLTF_OK);
+  munit_assert_size(count, ==, 27);
+  for (size_t i = 0; i < count; ++i) {
+    munit_assert_null(images[i].data);
+    munit_assert_size(images[i].size, ==, 0);
+    munit_assert_ptr_not_null(images[i].path);
+  }
+  mmdgltf_model_destroy(model_lenient);
+
+  mmdgltf_ModelConfig cfg_strict;
+  mmdgltf_model_config_default(&cfg_strict);
+  cfg_strict.load_flags = MMDGLTF_LOAD_TEXTURES;
+  cfg_strict.base_dir = "nonexistent_dir_12345";
+  cfg_strict.strict_textures = 1;
+
+  mmdgltf_Model model_strict = mmdgltf_model_create(pmx, &cfg_strict);
+  munit_assert_int(MMDGLTF_CHECK(model_strict), ==, MMDGLTF_ERROR_IO);
+
+  mmdgltf_pmx_destroy(pmx);
+  return MUNIT_OK;
+}
+
 static MunitResult test_model_errors(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
@@ -216,6 +339,7 @@ static MunitResult test_model_errors(const MunitParameter* params, void* data) {
   munit_assert_int(mmdgltf_model_vertex_buffers(NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_model_indices(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_model_materials(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
+  munit_assert_int(mmdgltf_model_images(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_model_bones(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_model_morphs(NULL, NULL, NULL), ==, MMDGLTF_ERROR_INVALID_ARGUMENT);
   munit_assert_int(mmdgltf_model_rigid_bodies(NULL, NULL, NULL), ==,
@@ -231,6 +355,10 @@ static MunitTest tests[] = {
    MUNIT_TEST_OPTION_NONE, NULL},
   {"/model/selective-loading", test_model_selective_loading, NULL, NULL, MUNIT_TEST_OPTION_NONE,
    NULL},
+  {"/model/textures-transcode", test_model_textures_format_transcode, NULL, NULL,
+   MUNIT_TEST_OPTION_NONE, NULL},
+  {"/model/textures-missing", test_model_textures_missing_strict_vs_lenient, NULL, NULL,
+   MUNIT_TEST_OPTION_NONE, NULL},
   {"/model/errors", test_model_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 };
 

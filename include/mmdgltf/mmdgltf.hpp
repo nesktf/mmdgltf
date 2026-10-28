@@ -39,6 +39,7 @@ using PmxDisplayItem = mmdgltf_PmxDisplayItem;
 using PmxDisplayElement = mmdgltf_PmxDisplayElement;
 using PmxRigidBody = mmdgltf_PmxRigidBody;
 using PmxJoint = mmdgltf_PmxJoint;
+using Image = mmdgltf_Image;
 using CoordinateSystem = mmdgltf_CoordinateSystem;
 using ModelConfig = mmdgltf_ModelConfig;
 using VertexBuffers = mmdgltf_VertexBuffers;
@@ -698,26 +699,24 @@ public:
   }
 
 public:
-  Expected<mmdgltf_PmxHeader> header() const noexcept {
-    mmdgltf_PmxHeader pmx_header;
+  Expected<PmxHeader> header() const noexcept {
+    PmxHeader pmx_header;
     if (auto err = mmdgltf_pmx_get_header(_pmx, &pmx_header); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
     return {in_place, pmx_header};
   }
 
-  Expected<mmdgltf_PmxModelInfo> info() const noexcept {
-    mmdgltf_PmxModelInfo pmx_info;
+  Expected<PmxModelInfo> model_info() const noexcept {
+    PmxModelInfo pmx_info;
     if (auto err = mmdgltf_pmx_get_model_info(_pmx, &pmx_info); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
     return {in_place, pmx_info};
   }
 
-  Expected<mmdgltf_PmxModelInfo> model_info() const noexcept { return info(); }
-
-  Expected<ArrayView<const mmdgltf_PmxVertex>> vertices() const noexcept {
-    const mmdgltf_PmxVertex* ptr = nullptr;
+  Expected<ArrayView<const PmxVertex>> vertices() const noexcept {
+    const PmxVertex* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_vertices(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -734,8 +733,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxTexture>> textures() const noexcept {
-    const mmdgltf_PmxTexture* ptr = nullptr;
+  Expected<ArrayView<const PmxTexture>> textures() const noexcept {
+    const PmxTexture* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_textures(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -743,8 +742,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxMaterial>> materials() const noexcept {
-    const mmdgltf_PmxMaterial* ptr = nullptr;
+  Expected<ArrayView<const PmxMaterial>> materials() const noexcept {
+    const PmxMaterial* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_materials(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -752,8 +751,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxBone>> bones() const noexcept {
-    const mmdgltf_PmxBone* ptr = nullptr;
+  Expected<ArrayView<const PmxBone>> bones() const noexcept {
+    const PmxBone* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_bones(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -761,8 +760,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxMorph>> morphs() const noexcept {
-    const mmdgltf_PmxMorph* ptr = nullptr;
+  Expected<ArrayView<const PmxMorph>> morphs() const noexcept {
+    const PmxMorph* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_morphs(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -770,8 +769,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxDisplayItem>> display_items() const noexcept {
-    const mmdgltf_PmxDisplayItem* ptr = nullptr;
+  Expected<ArrayView<const PmxDisplayItem>> display_items() const noexcept {
+    const PmxDisplayItem* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_display_items(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -779,8 +778,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxRigidBody>> rigid_bodies() const noexcept {
-    const mmdgltf_PmxRigidBody* ptr = nullptr;
+  Expected<ArrayView<const PmxRigidBody>> rigid_bodies() const noexcept {
+    const PmxRigidBody* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_rigid_bodies(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -788,8 +787,8 @@ public:
     return {in_place, ptr, count};
   }
 
-  Expected<ArrayView<const mmdgltf_PmxJoint>> joints() const noexcept {
-    const mmdgltf_PmxJoint* ptr = nullptr;
+  Expected<ArrayView<const PmxJoint>> joints() const noexcept {
+    const PmxJoint* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_pmx_joints(_pmx, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
@@ -893,6 +892,15 @@ public:
     const PmxMaterial* ptr = nullptr;
     size_t count = 0;
     if (auto err = mmdgltf_model_materials(_model, &ptr, &count); err != MMDGLTF_OK) {
+      return {unexpect, err};
+    }
+    return {in_place, ptr, count};
+  }
+
+  Expected<ArrayView<const Image>> images() const noexcept {
+    const Image* ptr = nullptr;
+    size_t count = 0;
+    if (auto err = mmdgltf_model_images(_model, &ptr, &count); err != MMDGLTF_OK) {
       return {unexpect, err};
     }
     return {in_place, ptr, count};

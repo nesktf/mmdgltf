@@ -736,6 +736,7 @@ on_load_error:
     mmdgltf__arena_destroy(arena);
   }
   return MMDGLTF_ENCODE_ERROR(err);
+#undef RET_ERR
 }
 
 MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size) {
@@ -780,6 +781,19 @@ MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_filen(const char* path, size_t path_len
 
   mmdgltf_Pmx pmx = mmdgltf_pmx_load_stream(&file_io, f);
   fclose(f);
+  if (MMDGLTF_CHECK(pmx) == MMDGLTF_OK && pmx) {
+    size_t last_slash = (size_t)-1;
+    for (size_t i = 0; i < path_len; ++i) {
+      if (path[i] == '/' || path[i] == '\\') {
+        last_slash = i;
+      }
+    }
+    if (last_slash != (size_t)-1) {
+      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, path, last_slash);
+    } else {
+      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, ".", 1);
+    }
+  }
   return pmx;
 }
 

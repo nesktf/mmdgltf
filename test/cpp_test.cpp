@@ -109,7 +109,7 @@ static void test_pmx_model_loading_and_getters() {
   assert(!exp_model->empty());
   assert(exp_model->raw() != nullptr);
 
-  auto info = exp_model->info();
+  auto info = exp_model->model_info();
   assert(info.has_value());
   assert(std::string(info->name_jp) == "河城にとり");
 
@@ -273,6 +273,13 @@ static void test_gpu_model_runtime() {
   auto joints = exp_model->joints();
   assert(joints.has_value());
   assert(joints->size() == 39);
+
+  auto images = exp_model->images();
+  assert(images.has_value());
+  assert(images->size() == 27);
+  assert((*images)[0].data != nullptr);
+  assert((*images)[0].size > 0);
+  assert(std::string((*images)[0].mime_type) == "image/png");
 
   mmdgltf::Model moved_model(std::move(*exp_model));
   assert(!moved_model.empty());

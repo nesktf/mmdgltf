@@ -107,6 +107,7 @@ extern const mmdgltf_StreamFunc mmdgltf__mem_io;
 
 struct mmdgltf_Pmx_T {
   mmdgltf_Arena* arena;
+  const char* base_dir;
   mmdgltf_PmxHeader header;
   mmdgltf_PmxModelInfo model_info;
   mmdgltf_PmxVertex* vertices;
@@ -146,6 +147,11 @@ struct mmdgltf_Model_T {
   size_t rigid_body_count;
   mmdgltf_PmxJoint* joints;
   size_t joint_count;
+  mmdgltf_Image* images;
+  size_t image_count;
 };
+
+mmdgltf_Status mmdgltf__image_load(const char* base_dir, const char* rel_path,
+                                   mmdgltf_Arena* arena, mmdgltf_Image* out_image);
 
 #endif // MMDGLTF_INTERNAL_H

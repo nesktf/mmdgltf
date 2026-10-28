@@ -9,6 +9,8 @@ MMDGLTF_API void mmdgltf_model_config_default(mmdgltf_ModelConfig* config) {
   config->load_flags = MMDGLTF_LOAD_ALL;
   config->coordinate_system = MMDGLTF_COORDS_GLTF_RIGHT_HANDED;
   config->scale = 1.0f;
+  config->base_dir = NULL;
+  config->strict_textures = 0;
 }
 
 static char* mmdgltf__model_strdup(mmdgltf_Arena* arena, const char* str) {
@@ -21,8 +23,14 @@ static char* mmdgltf__model_strdup(mmdgltf_Arena* arena, const char* str) {
 
 MMDGLTF_API mmdgltf_Model mmdgltf_model_create(mmdgltf_Pmx pmx,
                                                const mmdgltf_ModelConfig* config) {
+  mmdgltf_Status err;
+  mmdgltf_Arena* arena = NULL;
+#define RET_ERR(_err) \
+  err = _err;         \
+  goto on_model_error
+
   if (!pmx) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
+    RET_ERR(MMDGLTF_ERROR_INVALID_ARGUMENT);
   }
 
   mmdgltf_ModelConfig cfg;
@@ -38,15 +46,14 @@ MMDGLTF_API mmdgltf_Model mmdgltf_model_create(mmdgltf_Pmx pmx,
   const f32 scale = cfg.scale > 0.0f ? cfg.scale : 1.0f;
   const bool is_rh = (cfg.coordinate_system == MMDGLTF_COORDS_GLTF_RIGHT_HANDED);
 
-  mmdgltf_Arena* arena = mmdgltf__arena_create(64 * 1024);
+  arena = mmdgltf__arena_create(64 * 1024);
   if (!arena) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_OUT_OF_MEMORY);
+    RET_ERR(MMDGLTF_ERROR_OUT_OF_MEMORY);
   }
 
   mmdgltf_Model model = mmdgltf__arena_alloc(arena, sizeof(struct mmdgltf_Model_T));
   if (!model) {
-    mmdgltf__arena_destroy(arena);
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_OUT_OF_MEMORY);
+    RET_ERR(MMDGLTF_ERROR_OUT_OF_MEMORY);
   }
 
   memset(model, 0, sizeof(struct mmdgltf_Model_T));
@@ -398,7 +405,42 @@ MMDGLTF_API mmdgltf_Model mmdgltf_model_create(mmdgltf_Pmx pmx,
     }
   }
 
+  if (cfg.load_flags & MMDGLTF_LOAD_TEXTURES) {
+    const size_t tcount = pmx->texture_count;
+    model->image_count = tcount;
+    if (tcount > 0) {
+      model->images = mmdgltf__arena_alloc(arena, tcount * sizeof(mmdgltf_Image));
+      if (!model->images) {
+        RET_ERR(MMDGLTF_ERROR_OUT_OF_MEMORY);
+      }
+      memset(model->images, 0, tcount * sizeof(mmdgltf_Image));
+
+      const char* effective_base_dir = cfg.base_dir ? cfg.base_dir : pmx->base_dir;
+
+      for (size_t i = 0; i < tcount; ++i) {
+        const char* path = pmx->textures[i].path;
+        const mmdgltf_Status status =
+          mmdgltf__image_load(effective_base_dir, path, arena, &model->images[i]);
+        if (status != MMDGLTF_OK) {
+          if (cfg.strict_textures) {
+            RET_ERR(status);
+          }
+          if (!model->images[i].path && path) {
+            model->images[i].path = mmdgltf__arena_strndup(arena, path, strlen(path));
+          }
+        }
+      }
+    }
+  }
+
   return model;
+
+on_model_error:
+  if (arena) {
+    mmdgltf__arena_destroy(arena);
+  }
+  return MMDGLTF_ENCODE_ERROR(err);
+#undef RET_ERR
 }
 
 MMDGLTF_API void mmdgltf_model_destroy(mmdgltf_Model model) {
@@ -435,6 +477,17 @@ MMDGLTF_API mmdgltf_Status mmdgltf_model_materials(mmdgltf_Model model,
   }
   *out_materials = model->materials;
   *out_count = model->material_count;
+  return MMDGLTF_OK;
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_model_images(mmdgltf_Model model,
+                                                const mmdgltf_Image** out_images,
+                                                size_t* out_count) {
+  if (!model || !out_images || !out_count) {
+    return MMDGLTF_ERROR_INVALID_ARGUMENT;
+  }
+  *out_images = model->images;
+  *out_count = model->image_count;
   return MMDGLTF_OK;
 }
 
