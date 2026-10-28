@@ -5,7 +5,7 @@
 
 #define PMX_MIN_VALID_HEADER_SIZE 33
 
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_stream(const mmdgltf_StreamFunc* func, void* src) {
+mmdgltf_Pmx mmdgltf__pmx_load_stream(const mmdgltf_StreamFunc* func, void* src) {
   mmdgltf_Status err;
   mmdgltf_Arena* arena = NULL;
 
@@ -737,75 +737,6 @@ on_load_error:
   }
   return MMDGLTF_ENCODE_ERROR(err);
 #undef RET_ERR
-}
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_memory(const void* data, size_t size) {
-  if (!data || size < PMX_MIN_VALID_HEADER_SIZE) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
-  }
-  mmdgltf__MemStream mem = {
-    .data = (const u8*)data,
-    .size = size,
-    .pos = 0,
-  };
-  return mmdgltf_pmx_load_stream(&mmdgltf__mem_io, &mem);
-}
-
-static_assert(MMDGLTF_SEEK_CUR == SEEK_CUR, "SEEK_CUR mismatch");
-static_assert(MMDGLTF_SEEK_END == SEEK_END, "SEEK_END mismatch");
-static_assert(MMDGLTF_SEEK_SET == SEEK_SET, "SEEK_SET mismatch");
-const mmdgltf_StreamFunc mmdgltf__file_io = {
-  .read = (PFN_mmdgltf_read_func)fread,
-  .seek = (PFN_mmdgltf_seek_func)fseek,
-  .tell = (PFN_mmdgltf_tell_func)ftell,
-  .eof = (PFN_mmdgltf_eof_func)feof,
-};
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_filen(const char* path, size_t path_len) {
-  if (!path || path_len == 0) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
-  }
-
-  char* null_path = MMDGLTF_MALLOC(path_len + 1);
-  if (!null_path) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_OUT_OF_MEMORY);
-  }
-  memcpy(null_path, path, path_len);
-  null_path[path_len] = '\0';
-
-  FILE* f = fopen(null_path, "rb");
-  MMDGLTF_FREE(null_path, path_len + 1);
-  if (!f) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_IO);
-  }
-
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_stream(&mmdgltf__file_io, f);
-  fclose(f);
-  if (MMDGLTF_CHECK(pmx) == MMDGLTF_OK && pmx) {
-    size_t last_slash = (size_t)-1;
-    for (size_t i = 0; i < path_len; ++i) {
-      if (path[i] == '/' || path[i] == '\\') {
-        last_slash = i;
-      }
-    }
-    if (last_slash != (size_t)-1) {
-      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, path, last_slash);
-    } else {
-      pmx->base_dir = mmdgltf__arena_strndup(pmx->arena, ".", 1);
-    }
-  }
-  return pmx;
-}
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_file_n(const char* path, size_t path_len) {
-  return mmdgltf_pmx_load_filen(path, path_len);
-}
-
-MMDGLTF_API mmdgltf_Pmx mmdgltf_pmx_load_file(const char* path) {
-  if (!path) {
-    return MMDGLTF_ENCODE_ERROR(MMDGLTF_ERROR_INVALID_ARGUMENT);
-  }
-  return mmdgltf_pmx_load_filen(path, strlen(path));
 }
 
 MMDGLTF_API void mmdgltf_pmx_destroy(mmdgltf_Pmx pmx) {

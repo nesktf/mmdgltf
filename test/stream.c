@@ -274,6 +274,42 @@ static MunitResult test_stream_strings(const MunitParameter* params, void* data)
   return MUNIT_OK;
 }
 
+static MunitResult test_stream_cp932(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  mmdgltf_Arena* arena = mmdgltf__arena_create(1024);
+  munit_assert_ptr_not_null(arena);
+
+  // "初音ミク" in CP932
+  const u8 miku_cp932[] = {0x8F, 0x89, 0x89, 0xB9, 0x83, 0x7E, 0x83, 0x4E, 0x00, 0xFD, 0xFD};
+  char* decoded_miku = mmdgltf__decode_cp932(arena, miku_cp932, sizeof(miku_cp932));
+  munit_assert_ptr_not_null(decoded_miku);
+  munit_assert_string_equal(decoded_miku, "初音ミク");
+
+  // leading 0xFD returns empty string
+  const u8 fd_buf[] = {0xFD, 0x8F, 0x89};
+  char* decoded_fd = mmdgltf__decode_cp932(arena, fd_buf, sizeof(fd_buf));
+  munit_assert_ptr_not_null(decoded_fd);
+  munit_assert_string_equal(decoded_fd, "");
+
+  // half-width kana 0xB1 (ｱ), 0xB2 (ｲ), 0xB3 (ｳ)
+  const u8 kana_buf[] = {0xB1, 0xB2, 0xB3, 0x00};
+  char* decoded_kana = mmdgltf__decode_cp932(arena, kana_buf, sizeof(kana_buf));
+  munit_assert_ptr_not_null(decoded_kana);
+  munit_assert_string_equal(decoded_kana, "ｱｲｳ");
+
+  // stream read fixed string
+  mmdgltf__MemStream src;
+  mmdgltf_Stream s = init_mem_stream(&src, miku_cp932, sizeof(miku_cp932));
+  char* stream_str = mmdgltf__stream_read_string_cp932(&s, arena, sizeof(miku_cp932));
+  munit_assert_int(s.status, ==, MMDGLTF_OK);
+  munit_assert_string_equal(stream_str, "初音ミク");
+
+  mmdgltf__arena_destroy(arena);
+  return MUNIT_OK;
+}
+
 static MunitResult test_stream_errors(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
@@ -319,6 +355,7 @@ static MunitTest tests[] = {
   {"/stream/vectors", test_stream_vectors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/stream/indices", test_stream_indices, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/stream/strings", test_stream_strings, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/stream/cp932", test_stream_cp932, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/stream/errors", test_stream_errors, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
 };
 

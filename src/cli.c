@@ -15,10 +15,10 @@ static double get_time_sec(void) {
 }
 
 static void print_usage(const char* prog) {
-  printf("Usage: %s <input.pmx> [output] [options]\n\n", prog);
-  printf("Fast MMD (PMX) to glTF 2.0 / GLB converter.\n\n");
+  printf("Usage: %s <input.pmx|input.pmd> [output] [options]\n\n", prog);
+  printf("Fast MMD (PMX/PMD) to glTF 2.0 / GLB converter.\n\n");
   printf("Arguments:\n");
-  printf("  <input.pmx>         Path to source PMX model file\n");
+  printf("  <input>             Path to source PMX or PMD model file\n");
   printf("  [output]            Optional destination path (.glb or .gltf)\n\n");
   printf("Options:\n");
   printf("  --gltf              Emit separate text .gltf and .bin files (default: .glb)\n");
@@ -91,6 +91,7 @@ int main(int argc, char* argv[]) {
     }
     if (strcmp(arg, "--gltf") == 0) {
       is_gltf = true;
+      config.format = MMDGLTF_FORMAT_GLTF;
     } else if (strcmp(arg, "--unlit") == 0) {
       config.unlit = 1;
     } else if (strcmp(arg, "--verbose") == 0) {
@@ -139,7 +140,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (!input_file) {
-    fprintf(stderr, "Error: missing input PMX file.\n");
+    fprintf(stderr, "Error: missing input model file (.pmx or .pmd).\n");
     return 1;
   }
 
@@ -158,19 +159,29 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  const char* format_desc = "MMD";
+  FILE* probe_f = fopen(input_file, "rb");
+  if (probe_f) {
+    uint8_t probe_sig[3] = {0};
+    if (fread(probe_sig, 1, 3, probe_f) == 3) {
+      if (probe_sig[0] == 'P' && probe_sig[1] == 'M' && probe_sig[2] == 'X') {
+        format_desc = "PMX";
+      } else if (probe_sig[0] == 'P' && probe_sig[1] == 'm' && probe_sig[2] == 'd') {
+        format_desc = "PMD";
+      }
+    }
+    fclose(probe_f);
+  }
+
   if (verbose) {
-    printf("Converting '%s' -> '%s' (format: %s, scale: %.2f, unlit: %s, bone names: %s)...\n",
-           input_file, output_file, is_gltf ? "glTF (separate .bin)" : "GLB (binary)",
+    printf("Converting %s model '%s' -> '%s' (format: %s, scale: %.2f, unlit: %s, bone names: "
+           "%s)...\n",
+           format_desc, input_file, output_file, is_gltf ? "glTF (separate .bin)" : "GLB (binary)",
            config.scale, config.unlit ? "yes" : "no", config.english_bone_names ? "en" : "jp");
   }
 
   const double t0 = get_time_sec();
-  mmdgltf_Status st;
-  if (is_gltf) {
-    st = mmdgltf_convert_pmx_to_gltf_file(input_file, output_file, &config);
-  } else {
-    st = mmdgltf_convert_pmx_file(input_file, output_file, &config);
-  }
+  const mmdgltf_Status st = mmdgltf_convert_file(input_file, output_file, &config);
   const double t1 = get_time_sec();
 
   if (st != MMDGLTF_OK) {

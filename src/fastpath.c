@@ -2,9 +2,51 @@
 #include "tinygltf/tiny_gltf_v3.h"
 
 #include <float.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static bool is_knee_bone(const char* name) {
+  if (!name) {
+    return false;
+  }
+  const size_t len = strlen(name);
+  if (len >= 6 && strcmp(name + len - 6, "\xE3\x81\xB2\xE3\x81\x96") == 0) {
+    return true;
+  }
+  return false;
+}
+
+static mmdgltf_Vec3f vec3_normalize(mmdgltf_Vec3f v) {
+  const f32 len_sq = v.x * v.x + v.y * v.y + v.z * v.z;
+  if (len_sq > 1e-12f) {
+    const f32 inv_len = 1.0f / sqrtf(len_sq);
+    return (mmdgltf_Vec3f){v.x * inv_len, v.y * inv_len, v.z * inv_len};
+  }
+  return (mmdgltf_Vec3f){0.0f, 0.0f, 0.0f};
+}
+
+typedef struct PmdRawBone {
+  char* name_jp;
+  u16 parent;
+  u16 tail_bone;
+  u8 type;
+  i16 ik_bone;
+  mmdgltf_Vec3f position;
+} PmdRawBone;
+
+typedef struct PmdRawMorphItem {
+  u32 index;
+  mmdgltf_Vec3f offset;
+} PmdRawMorphItem;
+
+typedef struct PmdRawMorph {
+  char* name_jp;
+  u32 data_size;
+  u8 type;
+  PmdRawMorphItem* data;
+} PmdRawMorph;
 
 static char* extract_dir(mmdgltf_Arena* arena, const char* path, size_t len) {
   if (!path || len == 0) {
@@ -43,366 +85,1112 @@ static mmdgltf_Status convert_stream(mmdgltf_Stream* stream, const char* base_di
     mmdgltf_export_config_default(&cfg);
   }
 
-  u8 sig[4];
-  mmdgltf__stream_read_bytes(stream, sig, 4);
+  u8 sig[3];
+  mmdgltf__stream_read_bytes(stream, sig, 3);
   if (stream->status != MMDGLTF_OK) {
     RET_ERR(stream->status);
   }
-  if (sig[0] != 'P' || sig[1] != 'M' || sig[2] != 'X' || sig[3] != ' ') {
+
+  bool is_pmd = false;
+  if (sig[0] == 'P' && sig[1] == 'm' && sig[2] == 'd') {
+    is_pmd = true;
+  } else if (sig[0] == 'P' && sig[1] == 'M' && sig[2] == 'X') {
+    const u8 space = mmdgltf__stream_read_u8(stream);
+    if (space != ' ') {
+      RET_ERR(MMDGLTF_ERROR_INVALID_SIGNATURE);
+    }
+    is_pmd = false;
+  } else {
     RET_ERR(MMDGLTF_ERROR_INVALID_SIGNATURE);
   }
 
   const f32 version = mmdgltf__stream_read_f32(stream);
-  if (version < 2.0f || version > 2.1f) {
-    RET_ERR(MMDGLTF_ERROR_UNSUPPORTED_VERSION);
+  if (is_pmd) {
+    if (version < 0.99f || version > 1.01f) {
+      RET_ERR(MMDGLTF_ERROR_UNSUPPORTED_VERSION);
+    }
+  } else {
+    if (version < 2.0f || version > 2.1f) {
+      RET_ERR(MMDGLTF_ERROR_UNSUPPORTED_VERSION);
+    }
   }
-
-  const u8 globals_count = mmdgltf__stream_read_u8(stream);
-  if (globals_count < 8) {
-    RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  u8 globals[8];
-  mmdgltf__stream_read_bytes(stream, globals, 8);
-  for (u8 i = 8; i < globals_count; ++i) {
-    mmdgltf__stream_read_u8(stream);
-  }
-  if (stream->status != MMDGLTF_OK) {
-    RET_ERR(stream->status);
-  }
-
-  const mmdgltf_TextEncoding encoding = (mmdgltf_TextEncoding)globals[0];
-  const u8 extra_uvs = globals[1];
-  const u8 vtx_idx_size = globals[2];
-  const u8 tex_idx_size = globals[3];
-  const u8 mat_idx_size = globals[4];
-  const u8 bone_idx_size = globals[5];
-  const u8 morph_idx_size = globals[6];
-  const u8 rigid_idx_size = globals[7];
 
   arena = mmdgltf__arena_create(256 * 1024);
   if (!arena) {
     RET_ERR(MMDGLTF_ERROR_OUT_OF_MEMORY);
   }
 
-  mmdgltf__stream_read_string(stream, arena, encoding);
-  mmdgltf__stream_read_string(stream, arena, encoding);
-  mmdgltf__stream_read_string(stream, arena, encoding);
-  mmdgltf__stream_read_string(stream, arena, encoding);
-  if (stream->status != MMDGLTF_OK) {
-    RET_ERR(stream->status);
-  }
-
-  const i32 vertex_count = mmdgltf__stream_read_i32(stream);
-  if (stream->status != MMDGLTF_OK || vertex_count < 0) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const size_t vcount = (size_t)vertex_count;
   const bool has_skinning = cfg.export_skinning != 0;
   const f32 scale = cfg.scale > 0.0f ? cfg.scale : 1.0f;
 
-  const size_t pos_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 3 * sizeof(f32));
-  const size_t norm_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 3 * sizeof(f32));
-  const size_t uv_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 2 * sizeof(f32));
-
+  size_t vcount = 0;
+  size_t pos_offset = 0;
+  size_t norm_offset = 0;
+  size_t uv_offset = 0;
   size_t joints_offset = 0;
   size_t weights_offset = 0;
-  if (has_skinning) {
-    joints_offset =
-      mmdgltf__bytevec_append(&bw, NULL, vcount * MMDGLTF_MAX_BONE_WEIGHTS * sizeof(u16));
-    weights_offset =
-      mmdgltf__bytevec_append(&bw, NULL, vcount * MMDGLTF_MAX_BONE_WEIGHTS * sizeof(f32));
-  }
+  size_t indices_offset = 0;
+  size_t index_count = 0;
+  bool use_u16 = false;
+  size_t idx_elem_sz = 0;
 
-  f32* dst_pos = (f32*)(bw.data + pos_offset);
-  f32* dst_norm = (f32*)(bw.data + norm_offset);
-  f32* dst_uv = (f32*)(bw.data + uv_offset);
-  u16* dst_joints = has_skinning ? (u16*)(bw.data + joints_offset) : NULL;
-  f32* dst_weights = has_skinning ? (f32*)(bw.data + weights_offset) : NULL;
+  size_t mat_count = 0;
+  mmdgltf_PmxMaterial* materials = NULL;
+  size_t tex_count = 0;
+  mmdgltf_Image* images = NULL;
+
+  size_t b_count = 0;
+  mmdgltf_PmxBone* bones = NULL;
+
+  size_t m_count = 0;
+  mmdgltf_PmxMorph* morphs = NULL;
+
+  size_t rb_count = 0;
+  mmdgltf_PmxRigidBody* rigid_bodies = NULL;
+  size_t jt_count = 0;
+  mmdgltf_PmxJoint* joints = NULL;
 
   f64 pos_min[3] = {DBL_MAX, DBL_MAX, DBL_MAX};
   f64 pos_max[3] = {-DBL_MAX, -DBL_MAX, -DBL_MAX};
 
-  for (size_t i = 0; i < vcount; ++i) {
-    const mmdgltf_Vec3f p = mmdgltf__stream_read_vec3(stream);
-    const mmdgltf_Vec3f n = mmdgltf__stream_read_vec3(stream);
-    const mmdgltf_Vec2f uv = mmdgltf__stream_read_vec2(stream);
-
-    const f32 px = p.x * scale;
-    const f32 py = p.y * scale;
-    const f32 pz = -p.z * scale;
-
-    dst_pos[i * 3 + 0] = px;
-    dst_pos[i * 3 + 1] = py;
-    dst_pos[i * 3 + 2] = pz;
-
-    if (px < pos_min[0])
-      pos_min[0] = px;
-    if (py < pos_min[1])
-      pos_min[1] = py;
-    if (pz < pos_min[2])
-      pos_min[2] = pz;
-    if (px > pos_max[0])
-      pos_max[0] = px;
-    if (py > pos_max[1])
-      pos_max[1] = py;
-    if (pz > pos_max[2])
-      pos_max[2] = pz;
-
-    dst_norm[i * 3 + 0] = n.x;
-    dst_norm[i * 3 + 1] = n.y;
-    dst_norm[i * 3 + 2] = -n.z;
-
-    dst_uv[i * 2 + 0] = uv.x;
-    dst_uv[i * 2 + 1] = uv.y;
-
-    for (u8 u = 0; u < extra_uvs; ++u) {
-      mmdgltf__stream_read_vec4(stream);
-    }
-
-    const u8 weight_type = mmdgltf__stream_read_u8(stream);
-    u16 b_idx[MMDGLTF_MAX_BONE_WEIGHTS] = {0};
-    f32 b_wt[MMDGLTF_MAX_BONE_WEIGHTS] = {0.0f};
-
-    if (weight_type == MMDGLTF_WEIGHT_BDEF1) {
-      const i32 b0 = mmdgltf__stream_read_index(stream, bone_idx_size);
-      b_idx[0] = b0 >= 0 ? (u16)b0 : 0;
-      b_wt[0] = 1.0f;
-    } else if (weight_type == MMDGLTF_WEIGHT_BDEF2) {
-      const i32 b0 = mmdgltf__stream_read_index(stream, bone_idx_size);
-      const i32 b1 = mmdgltf__stream_read_index(stream, bone_idx_size);
-      const f32 w0 = mmdgltf__stream_read_f32(stream);
-      b_idx[0] = b0 >= 0 ? (u16)b0 : 0;
-      b_idx[1] = b1 >= 0 ? (u16)b1 : 0;
-      b_wt[0] = w0;
-      b_wt[1] = 1.0f - w0;
-    } else if (weight_type == MMDGLTF_WEIGHT_BDEF4 || weight_type == MMDGLTF_WEIGHT_QDEF) {
-      for (size_t b = 0; b < 4; ++b) {
-        const i32 bi = mmdgltf__stream_read_index(stream, bone_idx_size);
-        if (b < MMDGLTF_MAX_BONE_WEIGHTS) {
-          b_idx[b] = bi >= 0 ? (u16)bi : 0;
-        }
-      }
-      for (size_t b = 0; b < 4; ++b) {
-        const f32 wi = mmdgltf__stream_read_f32(stream);
-        if (b < MMDGLTF_MAX_BONE_WEIGHTS) {
-          b_wt[b] = wi;
-        }
-      }
-    } else if (weight_type == MMDGLTF_WEIGHT_SDEF) {
-      const i32 b0 = mmdgltf__stream_read_index(stream, bone_idx_size);
-      const i32 b1 = mmdgltf__stream_read_index(stream, bone_idx_size);
-      const f32 w0 = mmdgltf__stream_read_f32(stream);
-      b_idx[0] = b0 >= 0 ? (u16)b0 : 0;
-      b_idx[1] = b1 >= 0 ? (u16)b1 : 0;
-      b_wt[0] = w0;
-      b_wt[1] = 1.0f - w0;
-
-      mmdgltf__stream_read_vec3(stream);
-      mmdgltf__stream_read_vec3(stream);
-      mmdgltf__stream_read_vec3(stream);
-    } else {
+  if (!is_pmd) {
+    const u8 globals_count = mmdgltf__stream_read_u8(stream);
+    if (globals_count < 8) {
       RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
     }
 
-    mmdgltf__stream_read_f32(stream); // edge_scale
+    u8 globals[8];
+    mmdgltf__stream_read_bytes(stream, globals, 8);
+    for (u8 i = 8; i < globals_count; ++i) {
+      mmdgltf__stream_read_u8(stream);
+    }
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    const mmdgltf_TextEncoding encoding = (mmdgltf_TextEncoding)globals[0];
+    const u8 extra_uvs = globals[1];
+    const u8 vtx_idx_size = globals[2];
+    const u8 tex_idx_size = globals[3];
+    const u8 mat_idx_size = globals[4];
+    const u8 bone_idx_size = globals[5];
+    const u8 morph_idx_size = globals[6];
+    const u8 rigid_idx_size = globals[7];
+
+    mmdgltf__stream_read_string(stream, arena, encoding);
+    mmdgltf__stream_read_string(stream, arena, encoding);
+    mmdgltf__stream_read_string(stream, arena, encoding);
+    mmdgltf__stream_read_string(stream, arena, encoding);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    const i32 vertex_count = mmdgltf__stream_read_i32(stream);
+    if (stream->status != MMDGLTF_OK || vertex_count < 0) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    vcount = (size_t)vertex_count;
+    pos_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 3 * sizeof(f32));
+    norm_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 3 * sizeof(f32));
+    uv_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 2 * sizeof(f32));
 
     if (has_skinning) {
-      for (size_t b = 0; b < MMDGLTF_MAX_BONE_WEIGHTS; ++b) {
-        dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + b] = b_idx[b];
-        dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + b] = b_wt[b];
+      joints_offset =
+        mmdgltf__bytevec_append(&bw, NULL, vcount * MMDGLTF_MAX_BONE_WEIGHTS * sizeof(u16));
+      weights_offset =
+        mmdgltf__bytevec_append(&bw, NULL, vcount * MMDGLTF_MAX_BONE_WEIGHTS * sizeof(f32));
+    }
+
+    f32* dst_pos = (f32*)(bw.data + pos_offset);
+    f32* dst_norm = (f32*)(bw.data + norm_offset);
+    f32* dst_uv = (f32*)(bw.data + uv_offset);
+    u16* dst_joints = has_skinning ? (u16*)(bw.data + joints_offset) : NULL;
+    f32* dst_weights = has_skinning ? (f32*)(bw.data + weights_offset) : NULL;
+
+    for (size_t i = 0; i < vcount; ++i) {
+      const mmdgltf_Vec3f p = mmdgltf__stream_read_vec3(stream);
+      const mmdgltf_Vec3f n = mmdgltf__stream_read_vec3(stream);
+      const mmdgltf_Vec2f uv = mmdgltf__stream_read_vec2(stream);
+
+      const f32 px = p.x * scale;
+      const f32 py = p.y * scale;
+      const f32 pz = -p.z * scale;
+
+      dst_pos[i * 3 + 0] = px;
+      dst_pos[i * 3 + 1] = py;
+      dst_pos[i * 3 + 2] = pz;
+
+      if (px < pos_min[0])
+        pos_min[0] = px;
+      if (py < pos_min[1])
+        pos_min[1] = py;
+      if (pz < pos_min[2])
+        pos_min[2] = pz;
+      if (px > pos_max[0])
+        pos_max[0] = px;
+      if (py > pos_max[1])
+        pos_max[1] = py;
+      if (pz > pos_max[2])
+        pos_max[2] = pz;
+
+      dst_norm[i * 3 + 0] = n.x;
+      dst_norm[i * 3 + 1] = n.y;
+      dst_norm[i * 3 + 2] = -n.z;
+
+      dst_uv[i * 2 + 0] = uv.x;
+      dst_uv[i * 2 + 1] = uv.y;
+
+      for (u8 u = 0; u < extra_uvs; ++u) {
+        mmdgltf__stream_read_vec4(stream);
+      }
+
+      const u8 weight_type = mmdgltf__stream_read_u8(stream);
+      u16 b_idx[MMDGLTF_MAX_BONE_WEIGHTS] = {0};
+      f32 b_wt[MMDGLTF_MAX_BONE_WEIGHTS] = {0.0f};
+
+      if (weight_type == MMDGLTF_WEIGHT_BDEF1) {
+        const i32 b0 = mmdgltf__stream_read_index(stream, bone_idx_size);
+        b_idx[0] = b0 >= 0 ? (u16)b0 : 0;
+        b_wt[0] = 1.0f;
+      } else if (weight_type == MMDGLTF_WEIGHT_BDEF2) {
+        const i32 b0 = mmdgltf__stream_read_index(stream, bone_idx_size);
+        const i32 b1 = mmdgltf__stream_read_index(stream, bone_idx_size);
+        const f32 w0 = mmdgltf__stream_read_f32(stream);
+        b_idx[0] = b0 >= 0 ? (u16)b0 : 0;
+        b_idx[1] = b1 >= 0 ? (u16)b1 : 0;
+        b_wt[0] = w0;
+        b_wt[1] = 1.0f - w0;
+      } else if (weight_type == MMDGLTF_WEIGHT_BDEF4 || weight_type == MMDGLTF_WEIGHT_QDEF) {
+        for (size_t b = 0; b < 4; ++b) {
+          const i32 bi = mmdgltf__stream_read_index(stream, bone_idx_size);
+          if (b < MMDGLTF_MAX_BONE_WEIGHTS) {
+            b_idx[b] = bi >= 0 ? (u16)bi : 0;
+          }
+        }
+        for (size_t b = 0; b < 4; ++b) {
+          const f32 wi = mmdgltf__stream_read_f32(stream);
+          if (b < MMDGLTF_MAX_BONE_WEIGHTS) {
+            b_wt[b] = wi;
+          }
+        }
+      } else if (weight_type == MMDGLTF_WEIGHT_SDEF) {
+        const i32 b0 = mmdgltf__stream_read_index(stream, bone_idx_size);
+        const i32 b1 = mmdgltf__stream_read_index(stream, bone_idx_size);
+        const f32 w0 = mmdgltf__stream_read_f32(stream);
+        b_idx[0] = b0 >= 0 ? (u16)b0 : 0;
+        b_idx[1] = b1 >= 0 ? (u16)b1 : 0;
+        b_wt[0] = w0;
+        b_wt[1] = 1.0f - w0;
+
+        mmdgltf__stream_read_vec3(stream);
+        mmdgltf__stream_read_vec3(stream);
+        mmdgltf__stream_read_vec3(stream);
+      } else {
+        RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
+      }
+
+      mmdgltf__stream_read_f32(stream);
+
+      if (has_skinning) {
+        for (size_t b = 0; b < MMDGLTF_MAX_BONE_WEIGHTS; ++b) {
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + b] = b_idx[b];
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + b] = b_wt[b];
+        }
+      }
+
+      if (stream->status != MMDGLTF_OK) {
+        RET_ERR(stream->status);
+      }
+    }
+
+    const i32 surface_count = mmdgltf__stream_read_i32(stream);
+    if (stream->status != MMDGLTF_OK || surface_count < 0 || (surface_count % 3 != 0)) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    index_count = (size_t)surface_count;
+    use_u16 = (vcount <= 65535);
+    idx_elem_sz = use_u16 ? sizeof(u16) : sizeof(u32);
+    indices_offset = mmdgltf__bytevec_append(&bw, NULL, index_count * idx_elem_sz);
+
+    u16* dst_idx16 = use_u16 ? (u16*)(bw.data + indices_offset) : NULL;
+    u32* dst_idx32 = !use_u16 ? (u32*)(bw.data + indices_offset) : NULL;
+
+    for (size_t k = 0; k < index_count; k += 3) {
+      const u32 i0 = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
+      const u32 i1 = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
+      const u32 i2 = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
+
+      if (i0 >= vcount || i1 >= vcount || i2 >= vcount) {
+        RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
+      }
+
+      if (use_u16) {
+        dst_idx16[k + 0] = (u16)i0;
+        dst_idx16[k + 1] = (u16)i2;
+        dst_idx16[k + 2] = (u16)i1;
+      } else {
+        dst_idx32[k + 0] = i0;
+        dst_idx32[k + 1] = i2;
+        dst_idx32[k + 2] = i1;
       }
     }
 
     if (stream->status != MMDGLTF_OK) {
       RET_ERR(stream->status);
     }
-  }
 
-  const i32 surface_count = mmdgltf__stream_read_i32(stream);
-  if (stream->status != MMDGLTF_OK || surface_count < 0 || (surface_count % 3 != 0)) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const size_t index_count = (size_t)surface_count;
-  const bool use_u16 = (vcount <= 65535);
-  const size_t idx_elem_sz = use_u16 ? sizeof(u16) : sizeof(u32);
-  const size_t indices_offset = mmdgltf__bytevec_append(&bw, NULL, index_count * idx_elem_sz);
-
-  u16* dst_idx16 = use_u16 ? (u16*)(bw.data + indices_offset) : NULL;
-  u32* dst_idx32 = !use_u16 ? (u32*)(bw.data + indices_offset) : NULL;
-
-  for (size_t k = 0; k < index_count; k += 3) {
-    const u32 i0 = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
-    const u32 i1 = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
-    const u32 i2 = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
-
-    if (i0 >= vcount || i1 >= vcount || i2 >= vcount) {
-      RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
+    const i32 texture_count = mmdgltf__stream_read_i32(stream);
+    if (stream->status != MMDGLTF_OK || texture_count < 0) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
     }
 
-    if (use_u16) {
-      dst_idx16[k + 0] = (u16)i0;
-      dst_idx16[k + 1] = (u16)i2;
-      dst_idx16[k + 2] = (u16)i1;
-    } else {
-      dst_idx32[k + 0] = i0;
-      dst_idx32[k + 1] = i2;
-      dst_idx32[k + 2] = i1;
+    tex_count = (size_t)texture_count;
+    char** tex_paths = mmdgltf__arena_alloc(arena, tex_count * sizeof(char*));
+    for (size_t i = 0; i < tex_count; ++i) {
+      char* path = mmdgltf__stream_read_string(stream, arena, encoding);
+      if (path) {
+        for (char* p = path; *p; ++p) {
+          if (*p == '\\')
+            *p = '/';
+        }
+      }
+      tex_paths[i] = path;
     }
-  }
 
-  if (stream->status != MMDGLTF_OK) {
-    RET_ERR(stream->status);
-  }
-
-  const i32 texture_count = mmdgltf__stream_read_i32(stream);
-  if (stream->status != MMDGLTF_OK || texture_count < 0) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const size_t tex_count = (size_t)texture_count;
-  char** tex_paths = mmdgltf__arena_alloc(arena, tex_count * sizeof(char*));
-  for (size_t i = 0; i < tex_count; ++i) {
-    char* path = mmdgltf__stream_read_string(stream, arena, encoding);
-    if (path) {
-      for (char* p = path; *p; ++p) {
-        if (*p == '\\')
-          *p = '/';
+    images = mmdgltf__arena_alloc(arena, tex_count * sizeof(mmdgltf_Image));
+    memset(images, 0, tex_count * sizeof(mmdgltf_Image));
+    for (size_t i = 0; i < tex_count; ++i) {
+      if (tex_paths[i] && tex_paths[i][0] != '\0') {
+        mmdgltf_Image img;
+        memset(&img, 0, sizeof(img));
+        if (mmdgltf__image_load(base_dir, tex_paths[i], arena, &img) == MMDGLTF_OK) {
+          images[i] = img;
+        }
       }
     }
-    tex_paths[i] = path;
-  }
 
-  mmdgltf_Image* images = mmdgltf__arena_alloc(arena, tex_count * sizeof(mmdgltf_Image));
-  memset(images, 0, tex_count * sizeof(mmdgltf_Image));
-  for (size_t i = 0; i < tex_count; ++i) {
-    if (tex_paths[i] && tex_paths[i][0] != '\0') {
-      mmdgltf_Image img;
-      memset(&img, 0, sizeof(img));
-      if (mmdgltf__image_load(base_dir, tex_paths[i], arena, &img) == MMDGLTF_OK) {
-        images[i] = img;
+    const i32 material_count = mmdgltf__stream_read_i32(stream);
+    if (stream->status != MMDGLTF_OK || material_count < 0) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    mat_count = (size_t)material_count;
+    materials = mmdgltf__arena_alloc(arena, mat_count * sizeof(mmdgltf_PmxMaterial));
+    size_t total_mat_indices = 0;
+
+    for (size_t i = 0; i < mat_count; ++i) {
+      mmdgltf_PmxMaterial* m = &materials[i];
+      memset(m, 0, sizeof(*m));
+
+      m->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
+      m->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
+      m->diffuse = mmdgltf__stream_read_color4(stream);
+      m->specular = mmdgltf__stream_read_color3(stream);
+      m->shininess = mmdgltf__stream_read_f32(stream);
+      m->ambient = mmdgltf__stream_read_color3(stream);
+      m->draw_flags = mmdgltf__stream_read_u8(stream);
+      m->edge_color = mmdgltf__stream_read_color4(stream);
+      m->edge_size = mmdgltf__stream_read_f32(stream);
+      m->texture_index = mmdgltf__stream_read_index(stream, tex_idx_size);
+      m->sphere_texture_index = mmdgltf__stream_read_index(stream, tex_idx_size);
+      m->sphere_mode = (mmdgltf_SphereMode)mmdgltf__stream_read_u8(stream);
+      m->toon_sharing_flag = mmdgltf__stream_read_u8(stream);
+      if (m->toon_sharing_flag == 1) {
+        m->toon_index = (i32)mmdgltf__stream_read_u8(stream);
+      } else {
+        m->toon_index = mmdgltf__stream_read_index(stream, tex_idx_size);
+      }
+      m->comment = mmdgltf__stream_read_string(stream, arena, encoding);
+
+      const i32 mat_surface_count = mmdgltf__stream_read_i32(stream);
+      if (mat_surface_count < 0 || (mat_surface_count % 3 != 0)) {
+        RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
+      }
+      m->index_count = (u32)mat_surface_count;
+      total_mat_indices += (size_t)mat_surface_count;
+    }
+
+    if (stream->status != MMDGLTF_OK || total_mat_indices != index_count) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    const i32 bone_count = mmdgltf__stream_read_i32(stream);
+    if (stream->status != MMDGLTF_OK || bone_count < 0) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    b_count = (size_t)bone_count;
+    bones = mmdgltf__arena_alloc(arena, b_count * sizeof(mmdgltf_PmxBone));
+
+    for (size_t i = 0; i < b_count; ++i) {
+      mmdgltf_PmxBone* b = &bones[i];
+      memset(b, 0, sizeof(*b));
+
+      b->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
+      b->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
+
+      const mmdgltf_Vec3f bpos = mmdgltf__stream_read_vec3(stream);
+      b->position.x = bpos.x * scale;
+      b->position.y = bpos.y * scale;
+      b->position.z = -bpos.z * scale;
+
+      b->parent_index = mmdgltf__stream_read_index(stream, bone_idx_size);
+      b->transform_order = mmdgltf__stream_read_i32(stream);
+      b->flags = mmdgltf__stream_read_u16(stream);
+
+      if (b->flags & MMDGLTF_BONE_CONNECTION_TARGET_BONE) {
+        b->connection_bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
+      } else {
+        const mmdgltf_Vec3f conn = mmdgltf__stream_read_vec3(stream);
+        b->offset.x = conn.x * scale;
+        b->offset.y = conn.y * scale;
+        b->offset.z = -conn.z * scale;
+      }
+
+      if (b->flags & (MMDGLTF_BONE_APPEND_ROTATION | MMDGLTF_BONE_APPEND_TRANSLATION)) {
+        b->inherit_bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
+        b->inherit_weight = mmdgltf__stream_read_f32(stream);
+      }
+
+      if (b->flags & MMDGLTF_BONE_FIXED_AXIS) {
+        b->fixed_axis = mmdgltf__stream_read_vec3(stream);
+      }
+
+      if (b->flags & MMDGLTF_BONE_LOCAL_AXIS) {
+        b->local_x = mmdgltf__stream_read_vec3(stream);
+        b->local_z = mmdgltf__stream_read_vec3(stream);
+      }
+
+      if (b->flags & MMDGLTF_BONE_EXTERNAL_PARENT) {
+        b->external_parent_key = mmdgltf__stream_read_i32(stream);
+      }
+
+      if (b->flags & MMDGLTF_BONE_IK) {
+        b->ik_target_index = mmdgltf__stream_read_index(stream, bone_idx_size);
+        b->ik_loop_count = mmdgltf__stream_read_i32(stream);
+        b->ik_limit_angle = mmdgltf__stream_read_f32(stream);
+
+        const i32 link_count = mmdgltf__stream_read_i32(stream);
+        b->ik_link_count = link_count > 0 ? (u32)link_count : 0;
+        if (link_count > 0) {
+          mmdgltf_PmxIkLink* links =
+            mmdgltf__arena_alloc(arena, (size_t)link_count * sizeof(mmdgltf_PmxIkLink));
+          for (i32 j = 0; j < link_count; ++j) {
+            links[j].bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
+            links[j].has_limits = mmdgltf__stream_read_u8(stream);
+            if (links[j].has_limits) {
+              links[j].min_angle = mmdgltf__stream_read_vec3(stream);
+              links[j].max_angle = mmdgltf__stream_read_vec3(stream);
+            }
+          }
+          b->ik_links = links;
+        }
       }
     }
-  }
 
-  const i32 material_count = mmdgltf__stream_read_i32(stream);
-  if (stream->status != MMDGLTF_OK || material_count < 0) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const size_t mat_count = (size_t)material_count;
-  mmdgltf_PmxMaterial* materials =
-    mmdgltf__arena_alloc(arena, mat_count * sizeof(mmdgltf_PmxMaterial));
-  size_t total_mat_indices = 0;
-
-  for (size_t i = 0; i < mat_count; ++i) {
-    mmdgltf_PmxMaterial* m = &materials[i];
-    memset(m, 0, sizeof(*m));
-
-    m->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
-    m->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
-    m->diffuse = mmdgltf__stream_read_color4(stream);
-    m->specular = mmdgltf__stream_read_color3(stream);
-    m->shininess = mmdgltf__stream_read_f32(stream);
-    m->ambient = mmdgltf__stream_read_color3(stream);
-    m->draw_flags = mmdgltf__stream_read_u8(stream);
-    m->edge_color = mmdgltf__stream_read_color4(stream);
-    m->edge_size = mmdgltf__stream_read_f32(stream);
-    m->texture_index = mmdgltf__stream_read_index(stream, tex_idx_size);
-    m->sphere_texture_index = mmdgltf__stream_read_index(stream, tex_idx_size);
-    m->sphere_mode = (mmdgltf_SphereMode)mmdgltf__stream_read_u8(stream);
-    m->toon_sharing_flag = mmdgltf__stream_read_u8(stream);
-    if (m->toon_sharing_flag == 1) {
-      m->toon_index = (i32)mmdgltf__stream_read_u8(stream);
-    } else {
-      m->toon_index = mmdgltf__stream_read_index(stream, tex_idx_size);
-    }
-    m->comment = mmdgltf__stream_read_string(stream, arena, encoding);
-
-    const i32 mat_surface_count = mmdgltf__stream_read_i32(stream);
-    if (mat_surface_count < 0 || (mat_surface_count % 3 != 0)) {
-      RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
-    }
-    m->index_count = (u32)mat_surface_count;
-    total_mat_indices += (size_t)mat_surface_count;
-  }
-
-  if (stream->status != MMDGLTF_OK || total_mat_indices != index_count) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const i32 bone_count = mmdgltf__stream_read_i32(stream);
-  if (stream->status != MMDGLTF_OK || bone_count < 0) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const size_t b_count = (size_t)bone_count;
-  mmdgltf_PmxBone* bones = mmdgltf__arena_alloc(arena, b_count * sizeof(mmdgltf_PmxBone));
-
-  for (size_t i = 0; i < b_count; ++i) {
-    mmdgltf_PmxBone* b = &bones[i];
-    memset(b, 0, sizeof(*b));
-
-    b->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
-    b->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
-
-    const mmdgltf_Vec3f bpos = mmdgltf__stream_read_vec3(stream);
-    b->position.x = bpos.x * scale;
-    b->position.y = bpos.y * scale;
-    b->position.z = -bpos.z * scale;
-
-    b->parent_index = mmdgltf__stream_read_index(stream, bone_idx_size);
-    b->transform_order = mmdgltf__stream_read_i32(stream);
-    b->flags = mmdgltf__stream_read_u16(stream);
-
-    if (b->flags & MMDGLTF_BONE_CONNECTION_TARGET_BONE) {
-      b->connection_bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
-    } else {
-      const mmdgltf_Vec3f conn = mmdgltf__stream_read_vec3(stream);
-      b->offset.x = conn.x * scale;
-      b->offset.y = conn.y * scale;
-      b->offset.z = -conn.z * scale;
+    const i32 morph_count = mmdgltf__stream_read_i32(stream);
+    if (stream->status != MMDGLTF_OK || morph_count < 0) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
     }
 
-    if (b->flags & (MMDGLTF_BONE_APPEND_ROTATION | MMDGLTF_BONE_APPEND_TRANSLATION)) {
-      b->inherit_bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
-      b->inherit_weight = mmdgltf__stream_read_f32(stream);
+    m_count = (size_t)morph_count;
+    morphs = mmdgltf__arena_alloc(arena, m_count * sizeof(mmdgltf_PmxMorph));
+
+    for (size_t i = 0; i < m_count; ++i) {
+      mmdgltf_PmxMorph* m = &morphs[i];
+      memset(m, 0, sizeof(*m));
+
+      m->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
+      m->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
+      m->category = (mmdgltf_MorphCategory)mmdgltf__stream_read_u8(stream);
+      m->type = (mmdgltf_MorphType)mmdgltf__stream_read_u8(stream);
+
+      const i32 offset_count = mmdgltf__stream_read_i32(stream);
+      if (offset_count < 0) {
+        RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
+      }
+      m->offset_count = (u32)offset_count;
+
+      if (m->type == MMDGLTF_MORPH_VERTEX) {
+        mmdgltf_PmxVertexMorphOffset* voffsets =
+          mmdgltf__arena_alloc(arena, (size_t)offset_count * sizeof(mmdgltf_PmxVertexMorphOffset));
+        for (i32 j = 0; j < offset_count; ++j) {
+          voffsets[j].vertex_index = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
+          voffsets[j].position_offset = mmdgltf__stream_read_vec3(stream);
+        }
+        m->vertex_offsets = voffsets;
+      } else if (m->type >= MMDGLTF_MORPH_UV && m->type <= MMDGLTF_MORPH_EXTRA_UV4) {
+        for (i32 j = 0; j < offset_count; ++j) {
+          mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
+          mmdgltf__stream_read_vec4(stream);
+        }
+      } else if (m->type == MMDGLTF_MORPH_BONE) {
+        for (i32 j = 0; j < offset_count; ++j) {
+          mmdgltf__stream_read_index(stream, bone_idx_size);
+          mmdgltf__stream_read_vec3(stream);
+          mmdgltf__stream_read_quat(stream);
+        }
+      } else if (m->type == MMDGLTF_MORPH_MATERIAL) {
+        for (i32 j = 0; j < offset_count; ++j) {
+          mmdgltf__stream_read_index(stream, mat_idx_size);
+          mmdgltf__stream_read_u8(stream);
+          mmdgltf__stream_read_color4(stream);
+          mmdgltf__stream_read_color3(stream);
+          mmdgltf__stream_read_f32(stream);
+          mmdgltf__stream_read_color3(stream);
+          mmdgltf__stream_read_color4(stream);
+          mmdgltf__stream_read_f32(stream);
+          mmdgltf__stream_read_color4(stream);
+          mmdgltf__stream_read_color4(stream);
+          mmdgltf__stream_read_color4(stream);
+        }
+      } else if (m->type == MMDGLTF_MORPH_GROUP || m->type == MMDGLTF_MORPH_FLIP) {
+        for (i32 j = 0; j < offset_count; ++j) {
+          mmdgltf__stream_read_index(stream, morph_idx_size);
+          mmdgltf__stream_read_f32(stream);
+        }
+      } else if (m->type == MMDGLTF_MORPH_IMPULSE) {
+        for (i32 j = 0; j < offset_count; ++j) {
+          mmdgltf__stream_read_index(stream, rigid_idx_size);
+          mmdgltf__stream_read_u8(stream);
+          mmdgltf__stream_read_vec3(stream);
+          mmdgltf__stream_read_vec3(stream);
+        }
+      }
     }
 
-    if (b->flags & MMDGLTF_BONE_FIXED_AXIS) {
-      b->fixed_axis = mmdgltf__stream_read_vec3(stream);
+    const i32 disp_count = mmdgltf__stream_read_i32(stream);
+    if (disp_count > 0) {
+      for (i32 i = 0; i < disp_count; ++i) {
+        mmdgltf__stream_read_string(stream, arena, encoding);
+        mmdgltf__stream_read_string(stream, arena, encoding);
+        mmdgltf__stream_read_u8(stream);
+        const i32 elem_count = mmdgltf__stream_read_i32(stream);
+        for (i32 j = 0; j < elem_count; ++j) {
+          const u8 etype = mmdgltf__stream_read_u8(stream);
+          if (etype == 0) {
+            mmdgltf__stream_read_index(stream, bone_idx_size);
+          } else {
+            mmdgltf__stream_read_index(stream, morph_idx_size);
+          }
+        }
+      }
     }
 
-    if (b->flags & MMDGLTF_BONE_LOCAL_AXIS) {
-      b->local_x = mmdgltf__stream_read_vec3(stream);
-      b->local_z = mmdgltf__stream_read_vec3(stream);
+    const i32 rigid_count = mmdgltf__stream_read_i32(stream);
+    rb_count = (rigid_count > 0) ? (size_t)rigid_count : 0;
+    rigid_bodies =
+      rb_count > 0 ? mmdgltf__arena_alloc(arena, rb_count * sizeof(mmdgltf_PmxRigidBody)) : NULL;
+
+    for (size_t i = 0; i < rb_count; ++i) {
+      mmdgltf_PmxRigidBody* r = &rigid_bodies[i];
+      memset(r, 0, sizeof(*r));
+
+      r->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
+      r->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
+      r->bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
+      r->collision_group = mmdgltf__stream_read_u8(stream);
+      r->collision_mask = mmdgltf__stream_read_u16(stream);
+      r->shape_type = (mmdgltf_RigidShapeType)mmdgltf__stream_read_u8(stream);
+      r->size = mmdgltf__stream_read_vec3(stream);
+      r->position = mmdgltf__stream_read_vec3(stream);
+      r->rotation = mmdgltf__stream_read_vec3(stream);
+      r->mass = mmdgltf__stream_read_f32(stream);
+      r->linear_damping = mmdgltf__stream_read_f32(stream);
+      r->angular_damping = mmdgltf__stream_read_f32(stream);
+      r->restitution = mmdgltf__stream_read_f32(stream);
+      r->friction = mmdgltf__stream_read_f32(stream);
+      r->physics_mode = (mmdgltf_RigidPhysicsMode)mmdgltf__stream_read_u8(stream);
     }
 
-    if (b->flags & MMDGLTF_BONE_EXTERNAL_PARENT) {
-      b->external_parent_key = mmdgltf__stream_read_i32(stream);
+    const i32 joint_count = mmdgltf__stream_read_i32(stream);
+    jt_count = (joint_count > 0) ? (size_t)joint_count : 0;
+    joints =
+      jt_count > 0 ? mmdgltf__arena_alloc(arena, jt_count * sizeof(mmdgltf_PmxJoint)) : NULL;
+
+    for (size_t i = 0; i < jt_count; ++i) {
+      mmdgltf_PmxJoint* j = &joints[i];
+      memset(j, 0, sizeof(*j));
+
+      j->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
+      j->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
+      j->type = mmdgltf__stream_read_u8(stream);
+      j->src_rigid = mmdgltf__stream_read_index(stream, rigid_idx_size);
+      j->dest_rigid = mmdgltf__stream_read_index(stream, rigid_idx_size);
+      j->position = mmdgltf__stream_read_vec3(stream);
+      j->rotation = mmdgltf__stream_read_vec3(stream);
+      j->min_position = mmdgltf__stream_read_vec3(stream);
+      j->max_position = mmdgltf__stream_read_vec3(stream);
+      j->min_rotation = mmdgltf__stream_read_vec3(stream);
+      j->max_rotation = mmdgltf__stream_read_vec3(stream);
+      j->spring_position = mmdgltf__stream_read_vec3(stream);
+      j->spring_rotation = mmdgltf__stream_read_vec3(stream);
+    }
+  } else {
+    mmdgltf__stream_read_string_cp932(stream, arena, 20);
+    mmdgltf__stream_read_string_cp932(stream, arena, 256);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
     }
 
-    if (b->flags & MMDGLTF_BONE_IK) {
-      b->ik_target_index = mmdgltf__stream_read_index(stream, bone_idx_size);
-      b->ik_loop_count = mmdgltf__stream_read_i32(stream);
-      b->ik_limit_angle = mmdgltf__stream_read_f32(stream);
+    const u32 vertex_count = mmdgltf__stream_read_u32(stream);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
 
-      const i32 link_count = mmdgltf__stream_read_i32(stream);
-      b->ik_link_count = link_count > 0 ? (u32)link_count : 0;
-      if (link_count > 0) {
+    vcount = (size_t)vertex_count;
+    pos_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 3 * sizeof(f32));
+    norm_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 3 * sizeof(f32));
+    uv_offset = mmdgltf__bytevec_append(&bw, NULL, vcount * 2 * sizeof(f32));
+
+    if (has_skinning) {
+      joints_offset =
+        mmdgltf__bytevec_append(&bw, NULL, vcount * MMDGLTF_MAX_BONE_WEIGHTS * sizeof(u16));
+      weights_offset =
+        mmdgltf__bytevec_append(&bw, NULL, vcount * MMDGLTF_MAX_BONE_WEIGHTS * sizeof(f32));
+    }
+
+    f32* dst_pos = (f32*)(bw.data + pos_offset);
+    f32* dst_norm = (f32*)(bw.data + norm_offset);
+    f32* dst_uv = (f32*)(bw.data + uv_offset);
+    u16* dst_joints = has_skinning ? (u16*)(bw.data + joints_offset) : NULL;
+    f32* dst_weights = has_skinning ? (f32*)(bw.data + weights_offset) : NULL;
+
+    for (size_t i = 0; i < vcount; ++i) {
+      const mmdgltf_Vec3f p = mmdgltf__stream_read_vec3(stream);
+      const mmdgltf_Vec3f n = mmdgltf__stream_read_vec3(stream);
+      const mmdgltf_Vec2f uv = mmdgltf__stream_read_vec2(stream);
+      const u16 b0 = mmdgltf__stream_read_u16(stream);
+      const u16 b1 = mmdgltf__stream_read_u16(stream);
+      const u8 weight = mmdgltf__stream_read_u8(stream);
+      const u8 edge_flag = mmdgltf__stream_read_u8(stream);
+      UNUSED(edge_flag);
+
+      const f32 px = p.x * scale;
+      const f32 py = p.y * scale;
+      const f32 pz = -p.z * scale;
+
+      dst_pos[i * 3 + 0] = px;
+      dst_pos[i * 3 + 1] = py;
+      dst_pos[i * 3 + 2] = pz;
+
+      if (px < pos_min[0])
+        pos_min[0] = px;
+      if (py < pos_min[1])
+        pos_min[1] = py;
+      if (pz < pos_min[2])
+        pos_min[2] = pz;
+      if (px > pos_max[0])
+        pos_max[0] = px;
+      if (py > pos_max[1])
+        pos_max[1] = py;
+      if (pz > pos_max[2])
+        pos_max[2] = pz;
+
+      dst_norm[i * 3 + 0] = n.x;
+      dst_norm[i * 3 + 1] = n.y;
+      dst_norm[i * 3 + 2] = -n.z;
+
+      dst_uv[i * 2 + 0] = uv.x;
+      dst_uv[i * 2 + 1] = uv.y;
+
+      if (has_skinning) {
+        if (b0 == b1) {
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 0] = b0;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 1] = 0;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 2] = 0;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 3] = 0;
+
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 0] = 1.0f;
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 1] = 0.0f;
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 2] = 0.0f;
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 3] = 0.0f;
+        } else {
+          const f32 w0 = (f32)weight / 100.0f;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 0] = b0;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 1] = b1;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 2] = 0;
+          dst_joints[i * MMDGLTF_MAX_BONE_WEIGHTS + 3] = 0;
+
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 0] = w0;
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 1] = 1.0f - w0;
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 2] = 0.0f;
+          dst_weights[i * MMDGLTF_MAX_BONE_WEIGHTS + 3] = 0.0f;
+        }
+      }
+    }
+
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    const u32 face_vert_count = mmdgltf__stream_read_u32(stream);
+    if (stream->status != MMDGLTF_OK || (face_vert_count % 3 != 0)) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    index_count = (size_t)face_vert_count;
+    use_u16 = (vcount <= 65535);
+    idx_elem_sz = use_u16 ? sizeof(u16) : sizeof(u32);
+    indices_offset = mmdgltf__bytevec_append(&bw, NULL, index_count * idx_elem_sz);
+
+    u16* dst_idx16 = use_u16 ? (u16*)(bw.data + indices_offset) : NULL;
+    u32* dst_idx32 = !use_u16 ? (u32*)(bw.data + indices_offset) : NULL;
+
+    for (size_t k = 0; k < index_count; k += 3) {
+      const u16 i0 = mmdgltf__stream_read_u16(stream);
+      const u16 i1 = mmdgltf__stream_read_u16(stream);
+      const u16 i2 = mmdgltf__stream_read_u16(stream);
+
+      if (i0 >= vcount || i1 >= vcount || i2 >= vcount) {
+        RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
+      }
+
+      if (use_u16) {
+        dst_idx16[k + 0] = i0;
+        dst_idx16[k + 1] = i2;
+        dst_idx16[k + 2] = i1;
+      } else {
+        dst_idx32[k + 0] = (u32)i0;
+        dst_idx32[k + 1] = (u32)i2;
+        dst_idx32[k + 2] = (u32)i1;
+      }
+    }
+
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    const u32 material_count = mmdgltf__stream_read_u32(stream);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    mat_count = (size_t)material_count;
+    materials = mmdgltf__arena_alloc(arena, mat_count * sizeof(mmdgltf_PmxMaterial));
+    memset(materials, 0, mat_count * sizeof(mmdgltf_PmxMaterial));
+
+    mmdgltf__FastpathTexList tex_list = {0};
+    size_t total_mat_indices = 0;
+
+    for (size_t i = 0; i < mat_count; ++i) {
+      mmdgltf_PmxMaterial* m = &materials[i];
+      char name_buf[32];
+      snprintf(name_buf, sizeof(name_buf), "Material%zu", i + 1);
+      m->name_jp = mmdgltf__arena_strndup(arena, name_buf, strlen(name_buf));
+      m->name_en = m->name_jp;
+      m->comment = "";
+
+      m->diffuse = mmdgltf__stream_read_color4(stream);
+      m->shininess = mmdgltf__stream_read_f32(stream);
+      m->specular = mmdgltf__stream_read_color3(stream);
+      m->ambient = mmdgltf__stream_read_color3(stream);
+      const i8 toon_idx = mmdgltf__stream_read_i8(stream);
+      const u8 edge_flag = mmdgltf__stream_read_u8(stream);
+      m->index_count = mmdgltf__stream_read_u32(stream);
+      total_mat_indices += (size_t)m->index_count;
+
+      char* raw_tex = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+
+      m->draw_flags = 0;
+      if (m->diffuse.a < 1.0f) {
+        m->draw_flags |= MMDGLTF_MATERIAL_DOUBLE_SIDED;
+      }
+      if (edge_flag != 0) {
+        m->draw_flags |= MMDGLTF_MATERIAL_EDGE;
+      }
+      if (m->diffuse.a > 0.0f) {
+        m->draw_flags |= MMDGLTF_MATERIAL_GROUND_SHADOW | MMDGLTF_MATERIAL_SELF_SHADOW_MAP |
+                         MMDGLTF_MATERIAL_SELF_SHADOW;
+      }
+
+      m->edge_color = (mmdgltf_Color4f){0.0f, 0.0f, 0.0f, 1.0f};
+      m->edge_size = 1.0f;
+      m->texture_index = -1;
+      m->sphere_texture_index = -1;
+      m->sphere_mode = MMDGLTF_SPHERE_NONE;
+
+      if (raw_tex && raw_tex[0] != '\0') {
+        for (size_t k = 0; raw_tex[k] != '\0'; ++k) {
+          if (raw_tex[k] == '\\') {
+            raw_tex[k] = '/';
+          }
+        }
+        char* star = strchr(raw_tex, '*');
+        const char* diffuse_path = NULL;
+        const char* sphere_path = NULL;
+        mmdgltf_SphereMode sp_mode = MMDGLTF_SPHERE_NONE;
+
+        if (star) {
+          *star = '\0';
+          char* part1 = raw_tex;
+          char* part2 = star + 1;
+          if (!mmdgltf__ends_with_ci(part1, ".sph") && !mmdgltf__ends_with_ci(part1, ".spa")) {
+            diffuse_path = part1;
+          } else {
+            sphere_path = part1;
+            sp_mode =
+              mmdgltf__ends_with_ci(part1, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
+          }
+          if (part2[0] != '\0') {
+            sphere_path = part2;
+            sp_mode =
+              mmdgltf__ends_with_ci(part2, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
+          }
+        } else {
+          if (mmdgltf__ends_with_ci(raw_tex, ".sph") || mmdgltf__ends_with_ci(raw_tex, ".spa")) {
+            sphere_path = raw_tex;
+            sp_mode =
+              mmdgltf__ends_with_ci(raw_tex, ".spa") ? MMDGLTF_SPHERE_ADD : MMDGLTF_SPHERE_MUL;
+          } else {
+            diffuse_path = raw_tex;
+          }
+        }
+
+        if (diffuse_path && diffuse_path[0] != '\0') {
+          m->texture_index = mmdgltf__fastpath_tex_list_add(&tex_list, arena, diffuse_path);
+        }
+        if (sphere_path && sphere_path[0] != '\0') {
+          m->sphere_texture_index = mmdgltf__fastpath_tex_list_add(&tex_list, arena, sphere_path);
+          m->sphere_mode = sp_mode;
+        }
+      }
+
+      if (toon_idx >= 0 && toon_idx <= 9) {
+        m->toon_sharing_flag = 1;
+        m->toon_index = toon_idx;
+      } else {
+        m->toon_sharing_flag = 0;
+        m->toon_index = -1;
+      }
+    }
+
+    if (stream->status != MMDGLTF_OK || total_mat_indices != index_count) {
+      RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
+    }
+
+    tex_count = tex_list.count;
+    images =
+      (tex_count > 0) ? mmdgltf__arena_alloc(arena, tex_count * sizeof(mmdgltf_Image)) : NULL;
+    if (images) {
+      memset(images, 0, tex_count * sizeof(mmdgltf_Image));
+      for (size_t i = 0; i < tex_count; ++i) {
+        if (tex_list.paths[i] && tex_list.paths[i][0] != '\0') {
+          mmdgltf_Image img;
+          memset(&img, 0, sizeof(img));
+          if (mmdgltf__image_load(base_dir, tex_list.paths[i], arena, &img) == MMDGLTF_OK) {
+            images[i] = img;
+          }
+        }
+      }
+    }
+
+    const u16 bone_count = mmdgltf__stream_read_u16(stream);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    b_count = (size_t)bone_count;
+    PmdRawBone* raw_bones = NULL;
+    if (bone_count > 0) {
+      bones = mmdgltf__arena_alloc(arena, b_count * sizeof(mmdgltf_PmxBone));
+      raw_bones = mmdgltf__arena_alloc(arena, b_count * sizeof(PmdRawBone));
+      memset(bones, 0, b_count * sizeof(mmdgltf_PmxBone));
+
+      for (size_t i = 0; i < b_count; ++i) {
+        raw_bones[i].name_jp = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+        raw_bones[i].parent = mmdgltf__stream_read_u16(stream);
+        raw_bones[i].tail_bone = mmdgltf__stream_read_u16(stream);
+        raw_bones[i].type = mmdgltf__stream_read_u8(stream);
+        raw_bones[i].ik_bone = (raw_bones[i].type == 9) ? mmdgltf__stream_read_i16(stream)
+                                                        : (i16)mmdgltf__stream_read_u16(stream);
+        raw_bones[i].position = mmdgltf__stream_read_vec3(stream);
+      }
+      if (stream->status != MMDGLTF_OK) {
+        RET_ERR(stream->status);
+      }
+
+      for (size_t i = 0; i < b_count; ++i) {
+        mmdgltf_PmxBone* b = &bones[i];
+        const PmdRawBone* rb = &raw_bones[i];
+
+        b->name_jp = rb->name_jp;
+        b->name_en = "";
+        b->position.x = rb->position.x * scale;
+        b->position.y = rb->position.y * scale;
+        b->position.z = -rb->position.z * scale;
+        b->parent_index = (rb->parent == 0xFFFF) ? -1 : (i32)rb->parent;
+        b->connection_bone_index = -1;
+        b->inherit_bone_index = -1;
+        b->ik_target_index = -1;
+
+        uint16_t flags = MMDGLTF_BONE_ROTATABLE | MMDGLTF_BONE_CONTROLLABLE;
+        if (rb->type == 1) {
+          flags |= MMDGLTF_BONE_MOVABLE;
+        }
+        if (rb->type != 6 && rb->type != 7 && rb->type != 9) {
+          flags |= MMDGLTF_BONE_VISIBLE;
+        }
+
+        if (rb->tail_bone != 0xFFFF && (size_t)rb->tail_bone < b_count && rb->type != 8 &&
+            rb->type != 9) {
+          flags |= MMDGLTF_BONE_CONNECTION_TARGET_BONE;
+          b->connection_bone_index = (i32)rb->tail_bone;
+        }
+
+        if (rb->type == 2) {
+          b->transform_order = 1;
+        } else if (rb->type == 5) {
+          b->transform_order = 2;
+          flags |= MMDGLTF_BONE_APPEND_ROTATION;
+          b->inherit_bone_index = (i32)rb->ik_bone;
+          b->inherit_weight = 1.0f;
+        } else if (rb->type == 8) {
+          flags |= MMDGLTF_BONE_FIXED_AXIS;
+          if (rb->tail_bone != 0xFFFF && (size_t)rb->tail_bone < b_count) {
+            const mmdgltf_Vec3f tail_pos = raw_bones[rb->tail_bone].position;
+            const mmdgltf_Vec3f dir =
+              (mmdgltf_Vec3f){tail_pos.x - rb->position.x, tail_pos.y - rb->position.y,
+                              tail_pos.z - rb->position.z};
+            b->fixed_axis = vec3_normalize(dir);
+          }
+        } else if (rb->type == 9) {
+          flags |= MMDGLTF_BONE_APPEND_ROTATION;
+          b->inherit_bone_index = (rb->tail_bone == 0xFFFF) ? -1 : (i32)rb->tail_bone;
+          b->inherit_weight = (f32)rb->ik_bone / 100.0f;
+        }
+
+        b->flags = flags;
+      }
+
+      for (size_t i = 0; i < b_count; ++i) {
+        const i32 parent = bones[i].parent_index;
+        if (parent >= 0 && (size_t)parent < b_count) {
+          if (bones[i].transform_order < bones[parent].transform_order) {
+            bones[i].transform_order = bones[parent].transform_order;
+          }
+        }
+      }
+    }
+
+    const u16 ik_count = mmdgltf__stream_read_u16(stream);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    for (size_t i = 0; i < (size_t)ik_count; ++i) {
+      const u16 ik_bone = mmdgltf__stream_read_u16(stream);
+      const u16 target_bone = mmdgltf__stream_read_u16(stream);
+      const u8 ik_chain = mmdgltf__stream_read_u8(stream);
+      const u16 iterations = mmdgltf__stream_read_u16(stream);
+      const f32 control_weight = mmdgltf__stream_read_f32(stream);
+
+      u16* child_bones = mmdgltf__arena_alloc(arena, sizeof(u16) * ik_chain);
+      for (size_t j = 0; j < (size_t)ik_chain; ++j) {
+        child_bones[j] = mmdgltf__stream_read_u16(stream);
+      }
+      if (stream->status != MMDGLTF_OK) {
+        RET_ERR(stream->status);
+      }
+
+      if ((size_t)ik_bone < b_count) {
+        mmdgltf_PmxBone* b = &bones[ik_bone];
+        b->flags |= MMDGLTF_BONE_IK;
+        b->ik_target_index = (i32)target_bone;
+        b->ik_loop_count = (i32)iterations;
+        b->ik_limit_angle = control_weight * 4.0f;
+        b->ik_link_count = (u32)ik_chain;
+
         mmdgltf_PmxIkLink* links =
-          mmdgltf__arena_alloc(arena, (size_t)link_count * sizeof(mmdgltf_PmxIkLink));
-        for (i32 j = 0; j < link_count; ++j) {
-          links[j].bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
-          links[j].has_limits = mmdgltf__stream_read_u8(stream);
-          if (links[j].has_limits) {
-            links[j].min_angle = mmdgltf__stream_read_vec3(stream);
-            links[j].max_angle = mmdgltf__stream_read_vec3(stream);
+          mmdgltf__arena_alloc(arena, sizeof(mmdgltf_PmxIkLink) * (size_t)ik_chain);
+        for (size_t j = 0; j < (size_t)ik_chain; ++j) {
+          const u16 cb = child_bones[j];
+          links[j].bone_index = (i32)cb;
+          if ((size_t)cb < b_count && is_knee_bone(bones[cb].name_jp)) {
+            links[j].has_limits = 1;
+            links[j].min_angle = (mmdgltf_Vec3f){-3.14159265f, 0.0f, 0.0f};
+            links[j].max_angle = (mmdgltf_Vec3f){-0.00872665f, 0.0f, 0.0f};
+          } else {
+            links[j].has_limits = 0;
+            links[j].min_angle = (mmdgltf_Vec3f){0.0f, 0.0f, 0.0f};
+            links[j].max_angle = (mmdgltf_Vec3f){0.0f, 0.0f, 0.0f};
           }
         }
         b->ik_links = links;
+      }
+    }
+
+    const u16 morph_count = mmdgltf__stream_read_u16(stream);
+    if (stream->status != MMDGLTF_OK) {
+      RET_ERR(stream->status);
+    }
+
+    PmdRawMorph* raw_morphs = NULL;
+    if (morph_count > 0) {
+      raw_morphs = mmdgltf__arena_alloc(arena, sizeof(PmdRawMorph) * (size_t)morph_count);
+      for (size_t i = 0; i < (size_t)morph_count; ++i) {
+        raw_morphs[i].name_jp = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+        raw_morphs[i].data_size = mmdgltf__stream_read_u32(stream);
+        raw_morphs[i].type = mmdgltf__stream_read_u8(stream);
+        if (raw_morphs[i].data_size > 0) {
+          raw_morphs[i].data =
+            mmdgltf__arena_alloc(arena, sizeof(PmdRawMorphItem) * (size_t)raw_morphs[i].data_size);
+          for (size_t j = 0; j < (size_t)raw_morphs[i].data_size; ++j) {
+            raw_morphs[i].data[j].index = mmdgltf__stream_read_u32(stream);
+            raw_morphs[i].data[j].offset = mmdgltf__stream_read_vec3(stream);
+          }
+        }
+      }
+      if (stream->status != MMDGLTF_OK) {
+        RET_ERR(stream->status);
+      }
+
+      const PmdRawMorph* base_morph = NULL;
+      for (size_t i = 0; i < (size_t)morph_count; ++i) {
+        if (raw_morphs[i].type == 0) {
+          base_morph = &raw_morphs[i];
+          break;
+        }
+      }
+
+      if (base_morph && morph_count > 1) {
+        m_count = (size_t)(morph_count - 1);
+        morphs = mmdgltf__arena_alloc(arena, sizeof(mmdgltf_PmxMorph) * m_count);
+        memset(morphs, 0, sizeof(mmdgltf_PmxMorph) * m_count);
+
+        size_t out_m = 0;
+        for (size_t i = 0; i < (size_t)morph_count; ++i) {
+          if (raw_morphs[i].type == 0) {
+            continue;
+          }
+          mmdgltf_PmxMorph* m = &morphs[out_m++];
+          m->name_jp = raw_morphs[i].name_jp;
+          m->name_en = "";
+          m->type = MMDGLTF_MORPH_VERTEX;
+          m->category = (mmdgltf_MorphCategory)raw_morphs[i].type;
+          m->offset_count = raw_morphs[i].data_size;
+
+          if (m->offset_count > 0) {
+            mmdgltf_PmxVertexMorphOffset* voffsets = mmdgltf__arena_alloc(
+              arena, sizeof(mmdgltf_PmxVertexMorphOffset) * (size_t)m->offset_count);
+            for (size_t j = 0; j < (size_t)m->offset_count; ++j) {
+              const u32 base_idx = raw_morphs[i].data[j].index;
+              if (base_idx < base_morph->data_size) {
+                voffsets[j].vertex_index = base_morph->data[base_idx].index;
+                voffsets[j].position_offset = raw_morphs[i].data[j].offset;
+              } else {
+                voffsets[j].vertex_index = 0;
+                voffsets[j].position_offset = (mmdgltf_Vec3f){0.0f, 0.0f, 0.0f};
+              }
+            }
+            m->vertex_offsets = voffsets;
+          }
+        }
+      }
+    }
+
+    const u8 facial_count = mmdgltf__stream_read_u8(stream);
+    for (size_t i = 0; i < (size_t)facial_count; ++i) {
+      mmdgltf__stream_read_u16(stream);
+    }
+
+    const u8 bone_disp_count = mmdgltf__stream_read_u8(stream);
+    if (bone_disp_count > 0) {
+      for (size_t i = 0; i < (size_t)bone_disp_count; ++i) {
+        mmdgltf__stream_read_string_cp932(stream, arena, 50);
+      }
+    }
+
+    const u32 bone_elem_count = mmdgltf__stream_read_u32(stream);
+    for (size_t i = 0; i < (size_t)bone_elem_count; ++i) {
+      mmdgltf__stream_read_u16(stream);
+      mmdgltf__stream_read_u8(stream);
+    }
+
+    if (stream->status == MMDGLTF_OK) {
+      u8 eng_flag = 0;
+      if (stream->func.read(&eng_flag, 1, 1, stream->src) == 1) {
+        if (eng_flag == 1) {
+          mmdgltf__stream_read_string_cp932(stream, arena, 20);
+          mmdgltf__stream_read_string_cp932(stream, arena, 256);
+          for (size_t i = 0; i < b_count; ++i) {
+            bones[i].name_en = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+          }
+          for (size_t i = 0; i < m_count; ++i) {
+            morphs[i].name_en = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+          }
+          for (size_t i = 0; i < (size_t)bone_disp_count; ++i) {
+            mmdgltf__stream_read_string_cp932(stream, arena, 50);
+          }
+        }
+
+        for (size_t i = 0; i < 10; ++i) {
+          mmdgltf__stream_read_string_cp932(stream, arena, 100);
+        }
+
+        u32 rigid_count = 0;
+        if (stream->func.read(&rigid_count, 1, 4, stream->src) == 4) {
+          rb_count = (size_t)rigid_count;
+          if (rigid_count > 0) {
+            rigid_bodies = mmdgltf__arena_alloc(arena, sizeof(mmdgltf_PmxRigidBody) * rb_count);
+            memset(rigid_bodies, 0, sizeof(mmdgltf_PmxRigidBody) * rb_count);
+
+            for (size_t i = 0; i < rb_count; ++i) {
+              mmdgltf_PmxRigidBody* r = &rigid_bodies[i];
+              r->name_jp = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+              r->name_en = "";
+              const u16 rb_bone = mmdgltf__stream_read_u16(stream);
+              r->bone_index = (rb_bone == 0xFFFF) ? -1 : (i32)rb_bone;
+              r->collision_group = mmdgltf__stream_read_u8(stream);
+              r->collision_mask = mmdgltf__stream_read_u16(stream);
+              r->shape_type = (mmdgltf_RigidShapeType)mmdgltf__stream_read_u8(stream);
+              r->size = mmdgltf__stream_read_vec3(stream);
+              r->position = mmdgltf__stream_read_vec3(stream);
+              r->rotation = mmdgltf__stream_read_vec3(stream);
+              r->mass = mmdgltf__stream_read_f32(stream);
+              r->linear_damping = mmdgltf__stream_read_f32(stream);
+              r->angular_damping = mmdgltf__stream_read_f32(stream);
+              r->restitution = mmdgltf__stream_read_f32(stream);
+              r->friction = mmdgltf__stream_read_f32(stream);
+              r->physics_mode = (mmdgltf_RigidPhysicsMode)mmdgltf__stream_read_u8(stream);
+
+              if (r->bone_index >= 0 && (size_t)r->bone_index < b_count && raw_bones) {
+                const mmdgltf_Vec3f bpos = raw_bones[r->bone_index].position;
+                r->position.x += bpos.x;
+                r->position.y += bpos.y;
+                r->position.z += bpos.z;
+              }
+            }
+          }
+
+          u32 joint_count = 0;
+          if (stream->func.read(&joint_count, 1, 4, stream->src) == 4) {
+            jt_count = (size_t)joint_count;
+            if (joint_count > 0) {
+              joints = mmdgltf__arena_alloc(arena, sizeof(mmdgltf_PmxJoint) * jt_count);
+              memset(joints, 0, sizeof(mmdgltf_PmxJoint) * jt_count);
+
+              for (size_t i = 0; i < jt_count; ++i) {
+                mmdgltf_PmxJoint* j = &joints[i];
+                j->name_jp = mmdgltf__stream_read_string_cp932(stream, arena, 20);
+                j->name_en = "";
+                j->type = 0;
+                j->src_rigid = (i32)mmdgltf__stream_read_u32(stream);
+                j->dest_rigid = (i32)mmdgltf__stream_read_u32(stream);
+                j->position = mmdgltf__stream_read_vec3(stream);
+                j->rotation = mmdgltf__stream_read_vec3(stream);
+                j->min_position = mmdgltf__stream_read_vec3(stream);
+                j->max_position = mmdgltf__stream_read_vec3(stream);
+                j->min_rotation = mmdgltf__stream_read_vec3(stream);
+                j->max_rotation = mmdgltf__stream_read_vec3(stream);
+                j->spring_position = mmdgltf__stream_read_vec3(stream);
+                j->spring_rotation = mmdgltf__stream_read_vec3(stream);
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -422,145 +1210,6 @@ static mmdgltf_Status convert_stream(mmdgltf_Stream* stream, const char* base_di
       m[14] = -bones[i].position.z;
     }
     ibm_offset = mmdgltf__bytevec_append(&bw, ibm_data, b_count * 16 * sizeof(f32));
-  }
-
-  const i32 morph_count = mmdgltf__stream_read_i32(stream);
-  if (stream->status != MMDGLTF_OK || morph_count < 0) {
-    RET_ERR(stream->status != MMDGLTF_OK ? stream->status : MMDGLTF_ERROR_CORRUPT_DATA);
-  }
-
-  const size_t m_count = (size_t)morph_count;
-  mmdgltf_PmxMorph* morphs = mmdgltf__arena_alloc(arena, m_count * sizeof(mmdgltf_PmxMorph));
-
-  for (size_t i = 0; i < m_count; ++i) {
-    mmdgltf_PmxMorph* m = &morphs[i];
-    memset(m, 0, sizeof(*m));
-
-    m->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
-    m->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
-    m->category = (mmdgltf_MorphCategory)mmdgltf__stream_read_u8(stream);
-    m->type = (mmdgltf_MorphType)mmdgltf__stream_read_u8(stream);
-
-    const i32 offset_count = mmdgltf__stream_read_i32(stream);
-    if (offset_count < 0) {
-      RET_ERR(MMDGLTF_ERROR_CORRUPT_DATA);
-    }
-    m->offset_count = (u32)offset_count;
-
-    if (m->type == MMDGLTF_MORPH_VERTEX) {
-      mmdgltf_PmxVertexMorphOffset* voffsets =
-        mmdgltf__arena_alloc(arena, (size_t)offset_count * sizeof(mmdgltf_PmxVertexMorphOffset));
-      for (i32 j = 0; j < offset_count; ++j) {
-        voffsets[j].vertex_index = mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
-        voffsets[j].position_offset = mmdgltf__stream_read_vec3(stream);
-      }
-      m->vertex_offsets = voffsets;
-    } else if (m->type >= MMDGLTF_MORPH_UV && m->type <= MMDGLTF_MORPH_EXTRA_UV4) {
-      for (i32 j = 0; j < offset_count; ++j) {
-        mmdgltf__stream_read_vertex_index(stream, vtx_idx_size);
-        mmdgltf__stream_read_vec4(stream);
-      }
-    } else if (m->type == MMDGLTF_MORPH_BONE) {
-      for (i32 j = 0; j < offset_count; ++j) {
-        mmdgltf__stream_read_index(stream, bone_idx_size);
-        mmdgltf__stream_read_vec3(stream);
-        mmdgltf__stream_read_quat(stream);
-      }
-    } else if (m->type == MMDGLTF_MORPH_MATERIAL) {
-      for (i32 j = 0; j < offset_count; ++j) {
-        mmdgltf__stream_read_index(stream, mat_idx_size);
-        mmdgltf__stream_read_u8(stream);
-        mmdgltf__stream_read_color4(stream);
-        mmdgltf__stream_read_color3(stream);
-        mmdgltf__stream_read_f32(stream);
-        mmdgltf__stream_read_color3(stream);
-        mmdgltf__stream_read_color4(stream);
-        mmdgltf__stream_read_f32(stream);
-        mmdgltf__stream_read_color4(stream);
-        mmdgltf__stream_read_color4(stream);
-        mmdgltf__stream_read_color4(stream);
-      }
-    } else if (m->type == MMDGLTF_MORPH_GROUP || m->type == MMDGLTF_MORPH_FLIP) {
-      for (i32 j = 0; j < offset_count; ++j) {
-        mmdgltf__stream_read_index(stream, morph_idx_size);
-        mmdgltf__stream_read_f32(stream);
-      }
-    } else if (m->type == MMDGLTF_MORPH_IMPULSE) {
-      for (i32 j = 0; j < offset_count; ++j) {
-        mmdgltf__stream_read_index(stream, rigid_idx_size);
-        mmdgltf__stream_read_u8(stream);
-        mmdgltf__stream_read_vec3(stream);
-        mmdgltf__stream_read_vec3(stream);
-      }
-    }
-  }
-
-  const i32 disp_count = mmdgltf__stream_read_i32(stream);
-  if (disp_count > 0) {
-    for (i32 i = 0; i < disp_count; ++i) {
-      mmdgltf__stream_read_string(stream, arena, encoding);
-      mmdgltf__stream_read_string(stream, arena, encoding);
-      mmdgltf__stream_read_u8(stream);
-      const i32 elem_count = mmdgltf__stream_read_i32(stream);
-      for (i32 j = 0; j < elem_count; ++j) {
-        const u8 etype = mmdgltf__stream_read_u8(stream);
-        if (etype == 0) {
-          mmdgltf__stream_read_index(stream, bone_idx_size);
-        } else {
-          mmdgltf__stream_read_index(stream, morph_idx_size);
-        }
-      }
-    }
-  }
-
-  const i32 rigid_count = mmdgltf__stream_read_i32(stream);
-  const size_t rb_count = (rigid_count > 0) ? (size_t)rigid_count : 0;
-  mmdgltf_PmxRigidBody* rigid_bodies =
-    rb_count > 0 ? mmdgltf__arena_alloc(arena, rb_count * sizeof(mmdgltf_PmxRigidBody)) : NULL;
-
-  for (size_t i = 0; i < rb_count; ++i) {
-    mmdgltf_PmxRigidBody* r = &rigid_bodies[i];
-    memset(r, 0, sizeof(*r));
-
-    r->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
-    r->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
-    r->bone_index = mmdgltf__stream_read_index(stream, bone_idx_size);
-    r->collision_group = mmdgltf__stream_read_u8(stream);
-    r->collision_mask = mmdgltf__stream_read_u16(stream);
-    r->shape_type = (mmdgltf_RigidShapeType)mmdgltf__stream_read_u8(stream);
-    r->size = mmdgltf__stream_read_vec3(stream);
-    r->position = mmdgltf__stream_read_vec3(stream);
-    r->rotation = mmdgltf__stream_read_vec3(stream);
-    r->mass = mmdgltf__stream_read_f32(stream);
-    r->linear_damping = mmdgltf__stream_read_f32(stream);
-    r->angular_damping = mmdgltf__stream_read_f32(stream);
-    r->restitution = mmdgltf__stream_read_f32(stream);
-    r->friction = mmdgltf__stream_read_f32(stream);
-    r->physics_mode = (mmdgltf_RigidPhysicsMode)mmdgltf__stream_read_u8(stream);
-  }
-
-  const i32 joint_count = mmdgltf__stream_read_i32(stream);
-  const size_t jt_count = (joint_count > 0) ? (size_t)joint_count : 0;
-  mmdgltf_PmxJoint* joints =
-    jt_count > 0 ? mmdgltf__arena_alloc(arena, jt_count * sizeof(mmdgltf_PmxJoint)) : NULL;
-
-  for (size_t i = 0; i < jt_count; ++i) {
-    mmdgltf_PmxJoint* j = &joints[i];
-    memset(j, 0, sizeof(*j));
-
-    j->name_jp = mmdgltf__stream_read_string(stream, arena, encoding);
-    j->name_en = mmdgltf__stream_read_string(stream, arena, encoding);
-    j->type = mmdgltf__stream_read_u8(stream);
-    j->src_rigid = mmdgltf__stream_read_index(stream, rigid_idx_size);
-    j->dest_rigid = mmdgltf__stream_read_index(stream, rigid_idx_size);
-    j->position = mmdgltf__stream_read_vec3(stream);
-    j->rotation = mmdgltf__stream_read_vec3(stream);
-    j->min_position = mmdgltf__stream_read_vec3(stream);
-    j->max_position = mmdgltf__stream_read_vec3(stream);
-    j->min_rotation = mmdgltf__stream_read_vec3(stream);
-    j->max_rotation = mmdgltf__stream_read_vec3(stream);
-    j->spring_position = mmdgltf__stream_read_vec3(stream);
-    j->spring_rotation = mmdgltf__stream_read_vec3(stream);
   }
 
   size_t vertex_morph_count = 0;
@@ -1265,37 +1914,38 @@ on_convert_end:
 #undef RET_ERR
 }
 
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_filen(const char* pmx_path, size_t pmx_path_len,
-                                                     const char* glb_path, size_t glb_path_len,
-                                                     const mmdgltf_ExportConfig* config) {
-  if (!pmx_path || pmx_path_len == 0 || !glb_path || glb_path_len == 0) {
+static mmdgltf_Status convert_file_internal(const char* input_path, size_t input_path_len,
+                                            const char* out_path, size_t out_path_len,
+                                            const mmdgltf_ExportConfig* config,
+                                            bool write_binary) {
+  if (!input_path || input_path_len == 0 || !out_path || out_path_len == 0) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
 
-  char* null_pmx = MMDGLTF_MALLOC(pmx_path_len + 1);
-  if (!null_pmx) {
+  char* null_path = MMDGLTF_MALLOC(input_path_len + 1);
+  if (!null_path) {
     return MMDGLTF_ERROR_OUT_OF_MEMORY;
   }
-  memcpy(null_pmx, pmx_path, pmx_path_len);
-  null_pmx[pmx_path_len] = '\0';
+  memcpy(null_path, input_path, input_path_len);
+  null_path[input_path_len] = '\0';
 
-  FILE* f = fopen(null_pmx, "rb");
+  FILE* f = fopen(null_path, "rb");
   if (!f) {
-    MMDGLTF_FREE(null_pmx, pmx_path_len + 1);
+    MMDGLTF_FREE(null_path, input_path_len + 1);
     return MMDGLTF_ERROR_IO;
   }
 
   mmdgltf_Arena* dir_arena = mmdgltf__arena_create(4096);
-  char* base_dir = extract_dir(dir_arena, null_pmx, pmx_path_len);
-  MMDGLTF_FREE(null_pmx, pmx_path_len + 1);
+  char* base_dir = extract_dir(dir_arena, null_path, input_path_len);
+  MMDGLTF_FREE(null_path, input_path_len + 1);
 
   mmdgltf_Stream stream;
   stream.func = mmdgltf__file_io;
   stream.src = f;
   stream.status = MMDGLTF_OK;
 
-  const mmdgltf_Status st =
-    convert_stream(&stream, base_dir, config, glb_path, (u32)glb_path_len, NULL, NULL, true);
+  const mmdgltf_Status st = convert_stream(&stream, base_dir, config, out_path, (u32)out_path_len,
+                                           NULL, NULL, write_binary);
 
   fclose(f);
   if (dir_arena) {
@@ -1304,75 +1954,16 @@ MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_filen(const char* pmx_path, size_
   return st;
 }
 
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_file(const char* pmx_path, const char* glb_path,
-                                                    const mmdgltf_ExportConfig* config) {
-  if (!pmx_path || !glb_path) {
-    return MMDGLTF_ERROR_INVALID_ARGUMENT;
-  }
-  return mmdgltf_convert_pmx_filen(pmx_path, strlen(pmx_path), glb_path, strlen(glb_path), config);
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_to_gltf_filen(const char* pmx_path,
-                                                             size_t pmx_path_len,
-                                                             const char* gltf_path,
-                                                             size_t gltf_path_len,
-                                                             const mmdgltf_ExportConfig* config) {
-  if (!pmx_path || pmx_path_len == 0 || !gltf_path || gltf_path_len == 0) {
-    return MMDGLTF_ERROR_INVALID_ARGUMENT;
-  }
-
-  char* null_pmx = MMDGLTF_MALLOC(pmx_path_len + 1);
-  if (!null_pmx) {
-    return MMDGLTF_ERROR_OUT_OF_MEMORY;
-  }
-  memcpy(null_pmx, pmx_path, pmx_path_len);
-  null_pmx[pmx_path_len] = '\0';
-
-  FILE* f = fopen(null_pmx, "rb");
-  if (!f) {
-    MMDGLTF_FREE(null_pmx, pmx_path_len + 1);
-    return MMDGLTF_ERROR_IO;
-  }
-
-  mmdgltf_Arena* dir_arena = mmdgltf__arena_create(4096);
-  char* base_dir = extract_dir(dir_arena, null_pmx, pmx_path_len);
-  MMDGLTF_FREE(null_pmx, pmx_path_len + 1);
-
-  mmdgltf_Stream stream;
-  stream.func = mmdgltf__file_io;
-  stream.src = f;
-  stream.status = MMDGLTF_OK;
-
-  const mmdgltf_Status st =
-    convert_stream(&stream, base_dir, config, gltf_path, (u32)gltf_path_len, NULL, NULL, false);
-
-  fclose(f);
-  if (dir_arena) {
-    mmdgltf__arena_destroy(dir_arena);
-  }
-  return st;
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_to_gltf_file(const char* pmx_path,
-                                                            const char* gltf_path,
-                                                            const mmdgltf_ExportConfig* config) {
-  if (!pmx_path || !gltf_path) {
-    return MMDGLTF_ERROR_INVALID_ARGUMENT;
-  }
-  return mmdgltf_convert_pmx_to_gltf_filen(pmx_path, strlen(pmx_path), gltf_path,
-                                           strlen(gltf_path), config);
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_memory(const uint8_t* pmx_data, size_t pmx_size,
-                                                      uint8_t** out_glb_data, size_t* out_glb_size,
-                                                      const mmdgltf_ExportConfig* config) {
-  if (!pmx_data || pmx_size < 33 || !out_glb_data || !out_glb_size) {
+static mmdgltf_Status convert_memory_internal(const uint8_t* data, size_t size,
+                                              uint8_t** out_glb_data, size_t* out_glb_size,
+                                              const mmdgltf_ExportConfig* config) {
+  if (!data || size < 7 || !out_glb_data || !out_glb_size) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
 
   mmdgltf__MemStream mem = {
-    .data = (const u8*)pmx_data,
-    .size = pmx_size,
+    .data = (const u8*)data,
+    .size = size,
     .pos = 0,
   };
 
@@ -1381,5 +1972,29 @@ MMDGLTF_API mmdgltf_Status mmdgltf_convert_pmx_memory(const uint8_t* pmx_data, s
   stream.src = &mem;
   stream.status = MMDGLTF_OK;
 
-  return convert_stream(&stream, NULL, config, NULL, 0, out_glb_data, out_glb_size, true);
+  const bool write_binary = (config == NULL || config->format == MMDGLTF_FORMAT_GLB);
+  return convert_stream(&stream, NULL, config, NULL, 0, out_glb_data, out_glb_size, write_binary);
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_filen(const char* input_path, size_t input_path_len,
+                                                 const char* output_path, size_t output_path_len,
+                                                 const mmdgltf_ExportConfig* config) {
+  const bool write_binary = (config == NULL || config->format == MMDGLTF_FORMAT_GLB);
+  return convert_file_internal(input_path, input_path_len, output_path, output_path_len, config,
+                               write_binary);
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_file(const char* input_path, const char* output_path,
+                                                const mmdgltf_ExportConfig* config) {
+  if (!input_path || !output_path) {
+    return MMDGLTF_ERROR_INVALID_ARGUMENT;
+  }
+  return mmdgltf_convert_filen(input_path, strlen(input_path), output_path, strlen(output_path),
+                               config);
+}
+
+MMDGLTF_API mmdgltf_Status mmdgltf_convert_memory(const uint8_t* data, size_t size,
+                                                  uint8_t** out_glb_data, size_t* out_glb_size,
+                                                  const mmdgltf_ExportConfig* config) {
+  return convert_memory_internal(data, size, out_glb_data, out_glb_size, config);
 }

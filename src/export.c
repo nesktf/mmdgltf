@@ -10,6 +10,7 @@ MMDGLTF_API void mmdgltf_export_config_default(mmdgltf_ExportConfig* out_config)
   if (!out_config) {
     return;
   }
+  out_config->format = MMDGLTF_FORMAT_GLB;
   out_config->unlit = 0;
   out_config->export_skinning = 1;
   out_config->export_morphs = 1;
@@ -880,47 +881,32 @@ static mmdgltf_Status build_and_serialize(mmdgltf_Model model, const mmdgltf_Exp
   return MMDGLTF_OK;
 }
 
-MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_filen(mmdgltf_Model model, const char* filename,
-                                                    size_t filename_len,
-                                                    const mmdgltf_ExportConfig* config) {
+MMDGLTF_API mmdgltf_Status mmdgltf_export_filen(mmdgltf_Model model, const char* filename,
+                                                size_t filename_len,
+                                                const mmdgltf_ExportConfig* config) {
   if (!filename || filename_len == 0) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
-  return build_and_serialize(model, config, filename, (u32)filename_len, NULL, NULL, true);
+  const bool write_binary = (config == NULL || config->format == MMDGLTF_FORMAT_GLB);
+  return build_and_serialize(model, config, filename, (u32)filename_len, NULL, NULL, write_binary);
 }
 
-MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_file(mmdgltf_Model model, const char* filename,
-                                                   const mmdgltf_ExportConfig* config) {
+MMDGLTF_API mmdgltf_Status mmdgltf_export_file(mmdgltf_Model model, const char* filename,
+                                               const mmdgltf_ExportConfig* config) {
   if (!filename) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
-  return mmdgltf_export_glb_filen(model, filename, strlen(filename), config);
+  return mmdgltf_export_filen(model, filename, strlen(filename), config);
 }
 
-MMDGLTF_API mmdgltf_Status mmdgltf_export_gltf_filen(mmdgltf_Model model, const char* filename,
-                                                     size_t filename_len,
-                                                     const mmdgltf_ExportConfig* config) {
-  if (!filename || filename_len == 0) {
-    return MMDGLTF_ERROR_INVALID_ARGUMENT;
-  }
-  return build_and_serialize(model, config, filename, (u32)filename_len, NULL, NULL, false);
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_export_gltf_file(mmdgltf_Model model, const char* filename,
-                                                    const mmdgltf_ExportConfig* config) {
-  if (!filename) {
-    return MMDGLTF_ERROR_INVALID_ARGUMENT;
-  }
-  return mmdgltf_export_gltf_filen(model, filename, strlen(filename), config);
-}
-
-MMDGLTF_API mmdgltf_Status mmdgltf_export_glb_memory(mmdgltf_Model model, uint8_t** out_data,
-                                                     size_t* out_size,
-                                                     const mmdgltf_ExportConfig* config) {
+MMDGLTF_API mmdgltf_Status mmdgltf_export_memory(mmdgltf_Model model, uint8_t** out_data,
+                                                 size_t* out_size,
+                                                 const mmdgltf_ExportConfig* config) {
   if (!out_data || !out_size) {
     return MMDGLTF_ERROR_INVALID_ARGUMENT;
   }
-  return build_and_serialize(model, config, NULL, 0, out_data, out_size, true);
+  const bool write_binary = (config == NULL || config->format == MMDGLTF_FORMAT_GLB);
+  return build_and_serialize(model, config, NULL, 0, out_data, out_size, write_binary);
 }
 
 MMDGLTF_API void mmdgltf_export_free(uint8_t* data, size_t size) {

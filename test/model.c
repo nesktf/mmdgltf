@@ -1,13 +1,11 @@
 #include "paths.h"
 #include "tests.h"
 
-static const char* model_path = MMDGLTF_TEST_NITORI_PMX;
-
 static MunitResult test_model_create_default(const MunitParameter* params, void* data) {
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
   munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
 
@@ -101,7 +99,7 @@ static MunitResult test_model_coordinate_transforms(const MunitParameter* params
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg_rh;
@@ -172,7 +170,7 @@ static MunitResult test_model_selective_loading(const MunitParameter* params, vo
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg;
@@ -229,7 +227,7 @@ static MunitResult test_model_textures_format_transcode(const MunitParameter* pa
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg;
@@ -292,7 +290,7 @@ static MunitResult test_model_textures_missing_strict_vs_lenient(const MunitPara
   UNUSED(params);
   UNUSED(data);
 
-  mmdgltf_Pmx pmx = mmdgltf_pmx_load_file(model_path);
+  mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_NITORI_PMX);
   munit_assert_ptr_not_null(pmx);
 
   mmdgltf_ModelConfig cfg_lenient;
@@ -349,8 +347,67 @@ static MunitResult test_model_errors(const MunitParameter* params, void* data) {
   return MUNIT_OK;
 }
 
+static MunitResult test_model_create_pmd(const MunitParameter* params, void* data) {
+  UNUSED(params);
+  UNUSED(data);
+
+  const mmdgltf_Pmx pmx = mmdgltf_load_file(MMDGLTF_TEST_MIKU_PMD);
+  munit_assert_ptr_not_null(pmx);
+  munit_assert_int(MMDGLTF_CHECK(pmx), ==, MMDGLTF_OK);
+
+  const mmdgltf_Model model = mmdgltf_model_create(pmx, NULL);
+  munit_assert_ptr_not_null(model);
+  munit_assert_int(MMDGLTF_CHECK(model), ==, MMDGLTF_OK);
+
+  mmdgltf_pmx_destroy(pmx);
+
+  mmdgltf_VertexBuffers bufs;
+  mmdgltf_Status ret = mmdgltf_model_vertex_buffers(model, &bufs);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(bufs.vertex_count, ==, 9036);
+  munit_assert_ptr_not_null(bufs.positions);
+  munit_assert_ptr_not_null(bufs.normals);
+  munit_assert_ptr_not_null(bufs.uvs);
+  munit_assert_ptr_not_null(bufs.joints);
+  munit_assert_ptr_not_null(bufs.weights);
+
+  const uint32_t* indices = NULL;
+  size_t index_count = 0;
+  ret = mmdgltf_model_indices(model, &indices, &index_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(index_count, ==, 44991);
+
+  const mmdgltf_PmxBone* bones = NULL;
+  size_t bone_count = 0;
+  ret = mmdgltf_model_bones(model, &bones, &bone_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(bone_count, ==, 122);
+
+  const mmdgltf_PmxMorph* morphs = NULL;
+  size_t morph_count = 0;
+  ret = mmdgltf_model_morphs(model, &morphs, &morph_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(morph_count, ==, 15);
+
+  const mmdgltf_PmxRigidBody* rigids = NULL;
+  size_t rigid_count = 0;
+  ret = mmdgltf_model_rigid_bodies(model, &rigids, &rigid_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(rigid_count, ==, 45);
+
+  const mmdgltf_PmxJoint* joints = NULL;
+  size_t joint_count = 0;
+  ret = mmdgltf_model_joints(model, &joints, &joint_count);
+  munit_assert_int(ret, ==, MMDGLTF_OK);
+  munit_assert_size(joint_count, ==, 27);
+
+  mmdgltf_model_destroy(model);
+  return MUNIT_OK;
+}
+
 static MunitTest tests[] = {
   {"/model/create-default", test_model_create_default, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
+  {"/model/create-pmd", test_model_create_pmd, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL},
   {"/model/coordinate-transforms", test_model_coordinate_transforms, NULL, NULL,
    MUNIT_TEST_OPTION_NONE, NULL},
   {"/model/selective-loading", test_model_selective_loading, NULL, NULL, MUNIT_TEST_OPTION_NONE,
